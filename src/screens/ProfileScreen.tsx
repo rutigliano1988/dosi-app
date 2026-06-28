@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Caregiver } from '../data/types';
@@ -52,9 +51,9 @@ export default function ProfileScreen({ theme, t, lang, caregivers, onInviteCare
     {
       title: t('accessibility'),
       items: [
-        { icon: I.sun, label: t('theme'), value: lang === 'es' ? 'Automático' : 'Auto' },
-        { icon: I.globe, label: t('language'), value: lang === 'es' ? 'Español' : 'English' },
-        { icon: I.edit, label: lang === 'es' ? 'Tamaño de texto' : 'Text size', value: lang === 'es' ? 'Mediano' : 'Medium' },
+        { icon: I.sun, label: t('theme'), value: lang === 'es' ? 'AutomÃ¡tico' : 'Auto' },
+        { icon: I.globe, label: t('language'), value: lang === 'es' ? 'EspaÃ±ol' : 'English' },
+        { icon: I.edit, label: lang === 'es' ? 'TamaÃ±o de texto' : 'Text size', value: lang === 'es' ? 'Mediano' : 'Medium' },
       ],
     },
     {
@@ -91,10 +90,10 @@ export default function ProfileScreen({ theme, t, lang, caregivers, onInviteCare
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 19, fontWeight: 700, color: theme.text, letterSpacing: -0.3 }}>
-              {t('greetingName')} García
+              {t('greetingName')} GarcÃ­a
             </div>
             <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>
-              maria.g@email · {lang === 'es' ? '6 medicinas activas' : '6 active medicines'}
+              maria.g@email Â· {lang === 'es' ? '6 medicinas activas' : '6 active medicines'}
             </div>
           </div>
           <button style={{
@@ -130,7 +129,7 @@ export default function ProfileScreen({ theme, t, lang, caregivers, onInviteCare
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, letterSpacing: -0.1 }}>
                   {cg.name}{' '}
-                  <span style={{ color: theme.textDim, fontWeight: 500 }}>· {t(cg.relationKey)}</span>
+                  <span style={{ color: theme.textDim, fontWeight: 500 }}>Â· {t(cg.relationKey)}</span>
                 </div>
                 <div style={{ fontSize: 12.5, color: theme.textDim, marginTop: 2 }}>
                   {cg.permission === 'edit' ? t('cgPermissionFull') : t('cgPermissionViewOnly')}

@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Theme } from '../theme/tokens';
 
 interface ProgressRingProps {

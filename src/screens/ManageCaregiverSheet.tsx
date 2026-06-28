@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Caregiver } from '../data/types';

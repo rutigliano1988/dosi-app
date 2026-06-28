@@ -1,4 +1,3 @@
-import React from 'react';
 import { PILL_COLORS, type PillColorKey } from '../theme/tokens';
 import { I } from '../icons';
 import type { MedForm } from '../data/types';

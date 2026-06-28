@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Theme, PillColorKey } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine } from '../data/types';
@@ -92,7 +91,7 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
               {med.name}
             </div>
             <div style={{ color: 'rgba(28,24,18,0.65)', fontSize: 14, fontWeight: 500, marginTop: 4 }}>
-              {med.dose} · {t(formKey)}
+              {med.dose} Â· {t(formKey)}
             </div>
           </div>
         </div>
@@ -157,7 +156,7 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
               {med.stock}
             </div>
             <div style={{ color: theme.textDim, fontSize: 14, fontWeight: 500 }}>
-              {t('pillsLeft')} · {t('enoughFor')} {daysLeft} {t('daysOf')}
+              {t('pillsLeft')} Â· {t('enoughFor')} {daysLeft} {t('daysOf')}
             </div>
           </div>
           <div style={{ marginTop: 10, height: 6, borderRadius: 3, background: theme.surface2, overflow: 'hidden' }}>
@@ -205,7 +204,7 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
               }}>
                 {h.taken ? I.check(14, theme.success) : I.close(14, theme.danger)}
               </div>
-              <div style={{ flex: 1, fontSize: 14, color: theme.text }}>{h.day} · {h.time}</div>
+              <div style={{ flex: 1, fontSize: 14, color: theme.text }}>{h.day} Â· {h.time}</div>
               <div style={{ fontSize: 13, color: theme.textDim }}>
                 {h.taken ? t('taken') : t('skipDose')}
               </div>

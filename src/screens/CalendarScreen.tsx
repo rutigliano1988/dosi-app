@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import { tArr } from '../i18n/strings';
@@ -117,7 +117,7 @@ export default function CalendarScreen({ theme, t, lang, meds }: Props) {
                 86%
               </div>
               <div style={{ fontSize: 12.5, color: theme.textDim }}>
-                22 / 25 dosis · {lang === 'es' ? 'esta semana' : 'this week'}
+                22 / 25 dosis Â· {lang === 'es' ? 'esta semana' : 'this week'}
               </div>
             </div>
           </div>
@@ -125,7 +125,7 @@ export default function CalendarScreen({ theme, t, lang, meds }: Props) {
       </div>
 
       {/* Day timeline */}
-      <SectionList theme={theme} title={lang === 'es' ? 'Jueves 15 · hoy' : 'Thu 15 · today'}>
+      <SectionList theme={theme} title={lang === 'es' ? 'Jueves 15 Â· hoy' : 'Thu 15 Â· today'}>
         {TIMELINE.map((e, i) => {
           const m = allMeds.find(x => x.id === e.medId);
           if (!m) return null;

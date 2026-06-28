@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine } from '../data/types';
@@ -49,7 +49,7 @@ function InventoryRow({ theme, t, med, onOpen, warn }: {
           {expSoon && !warn && <Badge theme={theme} kind="warn">{t('expSoon')}</Badge>}
         </div>
         <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>
-          {med.dose} · {med.schedule.times.length}× / día
+          {med.dose} Â· {med.schedule.times.length}Ã— / dÃ­a
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>

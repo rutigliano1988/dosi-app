@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import { I } from '../icons';
@@ -110,7 +110,7 @@ export default function InviteCaregiverSheet({ theme, t, lang, onClose }: Props)
               {t('cgInvited')}
             </div>
             <div style={{ fontSize: 14, color: theme.textDim, marginTop: 6, marginBottom: 18 }}>
-              {lang === 'es' ? 'Recibirá un enlace por mensaje.' : "They'll get a link by message."}
+              {lang === 'es' ? 'RecibirÃ¡ un enlace por mensaje.' : "They'll get a link by message."}
             </div>
             <Btn theme={theme} kind="primary" size="md" full onClick={onClose}>
               {lang === 'es' ? 'Listo' : 'Done'}

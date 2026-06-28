@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Theme, PillColorKey } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
@@ -167,7 +166,7 @@ export default function HomeScreen({ theme, t, meds, doses, onMark, onSnooze, on
                 textTransform: 'uppercase', opacity: 0.85,
               }}>
                 {nowDose.status === 'now' ? t('nowLabel') : t('nextDose')}
-                <span>·</span>
+                <span>Â·</span>
                 {nowDose.time}
               </div>
               <button
@@ -197,7 +196,7 @@ export default function HomeScreen({ theme, t, meds, doses, onMark, onSnooze, on
                   {nowMed.name}
                 </div>
                 <div style={{ fontSize: 14, opacity: 0.75, marginTop: 2 }}>
-                  {nowMed.dose}{nowMed.notes ? ` · ${nowMed.notes.split('.')[0]}` : ''}
+                  {nowMed.dose}{nowMed.notes ? ` Â· ${nowMed.notes.split('.')[0]}` : ''}
                 </div>
               </div>
             </div>

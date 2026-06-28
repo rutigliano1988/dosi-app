@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Theme } from '../theme/tokens';
 import Btn from './Btn';
-import type { BtnProps } from './Btn';
 
 type ConfirmKind = 'danger' | 'primary';
 

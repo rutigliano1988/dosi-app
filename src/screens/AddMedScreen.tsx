@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Theme, PillColorKey } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine, MedForm, FreqKind } from '../data/types';
@@ -172,7 +172,7 @@ function StepStock({ theme, t, data, upd }: { theme: Theme; t: Props['t']; data:
           <button onClick={() => upd('stock', Math.max(0, data.stock - 1))} style={{
             width: 50, height: 50, borderRadius: 14, border: `1px solid ${theme.borderStrong}`,
             background: theme.surface, color: theme.text, fontSize: 22, fontWeight: 600, cursor: 'pointer',
-          }}>−</button>
+          }}>âˆ’</button>
           <div style={{
             flex: 1, height: 50, borderRadius: 14, background: theme.surface,
             border: `1px solid ${theme.borderStrong}`,

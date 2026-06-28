@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
@@ -57,13 +57,13 @@ export default function NotificationToast({ theme, t, lang, med, dose, onClose, 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.text, letterSpacing: 0.2 }}>
               <span style={{ textTransform: 'uppercase' }}>{t('appName')}</span>
-              <span style={{ color: theme.textSoft, fontWeight: 500 }}> · {lang === 'es' ? 'ahora' : 'now'}</span>
+              <span style={{ color: theme.textSoft, fontWeight: 500 }}> Â· {lang === 'es' ? 'ahora' : 'now'}</span>
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginTop: 2 }}>
               {t('notifTitle')}
             </div>
             <div style={{ fontSize: 13, color: theme.textDim, marginTop: 1 }}>
-              {med.name} · {med.dose} · {dose.time}
+              {med.name} Â· {med.dose} Â· {dose.time}
             </div>
           </div>
           <button onClick={onClose} style={{
