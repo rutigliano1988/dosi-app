@@ -33,6 +33,7 @@ export interface Dose {
   time: string;
   totalMin: number;
   status: DoseStatus;
+  date?: string; // ISO date — present in historical doses from Supabase
 }
 
 export interface Caregiver {

@@ -1,4 +1,4 @@
-import type { Theme } from '../theme/tokens';
+import type { Theme, ThemeName } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Caregiver } from '../data/types';
 import { I } from '../icons';
@@ -10,7 +10,10 @@ interface Props {
   theme: Theme;
   t: (key: string) => string;
   lang: Lang;
+  themeName: ThemeName;
   caregivers: Caregiver[];
+  onThemeChange: (t: ThemeName) => void;
+  onLangChange: (l: Lang) => void;
   onInviteCaregiver: () => void;
   onManageCaregiver: (cg: Caregiver) => void;
   onResetData: () => void;
@@ -31,11 +34,12 @@ function Avatar({ name, color, size = 44 }: { name: string; color: string; size?
   );
 }
 
-function ToggleSwitch({ on }: { on: boolean }) {
+function ToggleSwitch({ on, accentColor }: { on: boolean; accentColor: string }) {
   return (
     <div style={{
       width: 42, height: 24, borderRadius: 14, position: 'relative',
-      background: on ? '#c2530a' : 'rgba(28,24,18,0.14)', flexShrink: 0,
+      background: on ? accentColor : 'rgba(28,24,18,0.14)', flexShrink: 0,
+      transition: 'background .2s',
     }}>
       <div style={{
         position: 'absolute', top: 2, left: on ? 20 : 2,
@@ -46,14 +50,38 @@ function ToggleSwitch({ on }: { on: boolean }) {
   );
 }
 
-export default function ProfileScreen({ theme, t, lang, caregivers, onInviteCaregiver, onManageCaregiver, onResetData, onLoadDemo }: Props) {
+export default function ProfileScreen({
+  theme, t, lang, themeName, caregivers,
+  onThemeChange, onLangChange,
+  onInviteCaregiver, onManageCaregiver, onResetData, onLoadDemo,
+}: Props) {
+  const isDark = themeName === 'dark';
+  const themeLabel = isDark
+    ? (lang === 'es' ? 'Oscuro' : 'Dark')
+    : (lang === 'es' ? 'Claro' : 'Light');
+  const langLabel = lang === 'es' ? 'Español' : 'English';
+
   const settingsGroups = [
     {
       title: t('accessibility'),
       items: [
-        { icon: I.sun, label: t('theme'), value: lang === 'es' ? 'AutomÃ¡tico' : 'Auto' },
-        { icon: I.globe, label: t('language'), value: lang === 'es' ? 'EspaÃ±ol' : 'English' },
-        { icon: I.edit, label: lang === 'es' ? 'TamaÃ±o de texto' : 'Text size', value: lang === 'es' ? 'Mediano' : 'Medium' },
+        {
+          icon: I.sun,
+          label: t('theme'),
+          value: themeLabel,
+          onPress: () => onThemeChange(isDark ? 'light' : 'dark'),
+        },
+        {
+          icon: I.globe,
+          label: t('language'),
+          value: langLabel,
+          onPress: () => onLangChange(lang === 'es' ? 'en' : 'es'),
+        },
+        {
+          icon: I.edit,
+          label: lang === 'es' ? 'Tamaño de texto' : 'Text size',
+          value: lang === 'es' ? 'Mediano' : 'Medium',
+        },
       ],
     },
     {
@@ -90,10 +118,10 @@ export default function ProfileScreen({ theme, t, lang, caregivers, onInviteCare
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 19, fontWeight: 700, color: theme.text, letterSpacing: -0.3 }}>
-              {t('greetingName')} GarcÃ­a
+              {t('greetingName')} García
             </div>
             <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>
-              maria.g@email Â· {lang === 'es' ? '6 medicinas activas' : '6 active medicines'}
+              maria.g@email · {lang === 'es' ? '6 medicinas activas' : '6 active medicines'}
             </div>
           </div>
           <button style={{
@@ -129,7 +157,7 @@ export default function ProfileScreen({ theme, t, lang, caregivers, onInviteCare
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, letterSpacing: -0.1 }}>
                   {cg.name}{' '}
-                  <span style={{ color: theme.textDim, fontWeight: 500 }}>Â· {t(cg.relationKey)}</span>
+                  <span style={{ color: theme.textDim, fontWeight: 500 }}>· {t(cg.relationKey)}</span>
                 </div>
                 <div style={{ fontSize: 12.5, color: theme.textDim, marginTop: 2 }}>
                   {cg.permission === 'edit' ? t('cgPermissionFull') : t('cgPermissionViewOnly')}
@@ -168,11 +196,16 @@ export default function ProfileScreen({ theme, t, lang, caregivers, onInviteCare
           </div>
           <Card theme={theme} style={{ overflow: 'hidden' }}>
             {g.items.map((it, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '14px 16px',
-                borderTop: i > 0 ? `1px solid ${theme.border}` : 'none',
-              }}>
+              <div
+                key={i}
+                onClick={'onPress' in it ? it.onPress : undefined}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '14px 16px',
+                  borderTop: i > 0 ? `1px solid ${theme.border}` : 'none',
+                  cursor: 'onPress' in it ? 'pointer' : 'default',
+                }}
+              >
                 <div style={{
                   width: 34, height: 34, borderRadius: 10,
                   background: theme.surface2, color: theme.text,
@@ -184,7 +217,7 @@ export default function ProfileScreen({ theme, t, lang, caregivers, onInviteCare
                   {it.label}
                 </div>
                 {'toggle' in it && it.toggle ? (
-                  <ToggleSwitch on={it.on ?? false} />
+                  <ToggleSwitch on={it.on ?? false} accentColor={theme.accent} />
                 ) : (
                   <>
                     <div style={{ fontSize: 13.5, color: theme.textDim, fontWeight: 500 }}>

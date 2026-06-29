@@ -87,6 +87,36 @@ export async function pushDoses(doses: Dose[], userId: string) {
   if (error) console.error('[dosi] pushDoses error:', error.message);
 }
 
+// ─── History ─────────────────────────────────────────────────────────────────
+
+export async function pullHistory(userId: string, days = 7): Promise<import('./types').Dose[]> {
+  const dates: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+
+  const { data, error } = await supabase
+    .from('doses')
+    .select('*')
+    .eq('user_id', userId)
+    .in('date', dates)
+    .order('date', { ascending: true })
+    .order('total_min', { ascending: true });
+
+  if (error) { console.error('[dosi] pullHistory error:', error.message); return []; }
+
+  return data.map(r => ({
+    id:       r.id,
+    medId:    r.med_id,
+    time:     r.time,
+    totalMin: r.total_min,
+    status:   r.status,
+    date:     r.date,
+  }));
+}
+
 // ─── Pull ─────────────────────────────────────────────────────────────────────
 
 interface PullResult {

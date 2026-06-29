@@ -5,7 +5,7 @@ import { INITIAL_MEDS, PATIENT_CAREGIVERS } from './data/mock';
 import { buildTodayDoses, shiftTime } from './data/buildTodayDoses';
 import { dosiStore } from './data/store';
 import { ensureSession } from './lib/supabase';
-import { pullAll, pushMeds, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
+import { pullAll, pullHistory, pushMeds, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
 import type { Medicine, Dose, Caregiver } from './data/types';
 import { I } from './icons';
 
@@ -29,6 +29,16 @@ import ManageCaregiverSheet from './screens/ManageCaregiverSheet';
 export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail';
 export type TabId = 'home' | 'inventory' | 'calendar' | 'profile';
 
+const SETTINGS_KEY = 'dosi-settings';
+
+function readSettings(): { themeName?: ThemeName; lang?: Lang } {
+  try {
+    const s = localStorage.getItem(SETTINGS_KEY);
+    if (s) return JSON.parse(s);
+  } catch {}
+  return {};
+}
+
 interface AppProps {
   themeName?: ThemeName;
   lang?: Lang;
@@ -41,7 +51,12 @@ interface ToastData {
   icon?: React.ReactNode;
 }
 
-export default function App({ themeName = 'light', lang = 'es', persistKey }: AppProps) {
+export default function App({ themeName: initialTheme = 'light', lang: initialLang = 'es', persistKey }: AppProps) {
+  const saved = readSettings();
+
+  const [themeName, setThemeNameState] = useState<ThemeName>(saved.themeName ?? initialTheme);
+  const [lang, setLangState] = useState<Lang>(saved.lang ?? initialLang);
+
   const theme = getTheme(themeName);
   const t = (key: string, vars?: Record<string, string | number>) => tstr(lang, key, vars);
 
@@ -59,6 +74,7 @@ export default function App({ themeName = 'light', lang = 'es', persistKey }: Ap
   const [tab, setTab] = useState<TabId>('home');
   const [meds, setMeds] = useState<Medicine[]>(startMeds);
   const [doses, setDoses] = useState<Dose[]>(startDoses);
+  const [historyDoses, setHistoryDoses] = useState<Dose[]>([]);
   const [selMedId, setSelMedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Medicine | null>(null);
   const [notif, setNotif] = useState<{ med: Medicine; dose: Dose } | null>(null);
@@ -72,6 +88,11 @@ export default function App({ themeName = 'light', lang = 'es', persistKey }: Ap
   const [confirmReset, setConfirmReset] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
 
+  // Persist settings changes
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ themeName, lang }));
+  }, [themeName, lang]);
+
   useEffect(() => {
     if (!persistKey) return;
     dosiStore.write(persistKey, { meds, doses, date: todayStr });
@@ -84,20 +105,23 @@ export default function App({ themeName = 'light', lang = 'es', persistKey }: Ap
       if (!uid) return;
       userId.current = uid;
 
-      const remote = await pullAll(uid);
+      const [remote, history] = await Promise.all([
+        pullAll(uid),
+        pullHistory(uid, 7),
+      ]);
+
+      setHistoryDoses(history);
+
       if (remote) {
-        // Remote has data → use it as source of truth
         setMeds(remote.meds);
         if (remote.doses.length > 0) {
           setDoses(remote.doses);
         } else {
-          // Remote has meds but no doses for today → build and push them
           const fresh = buildTodayDoses(remote.meds, new Date().getHours());
           setDoses(fresh);
           pushDoses(fresh, uid);
         }
       } else {
-        // No remote data → push local initial data to Supabase
         await pushMeds(startMeds, uid);
         await pushDoses(startDoses, uid);
       }
@@ -118,6 +142,9 @@ export default function App({ themeName = 'light', lang = 'es', persistKey }: Ap
     });
   }, [meds, persistKey]);
 
+  const setThemeName = (name: ThemeName) => setThemeNameState(name);
+  const setLang = (l: Lang) => setLangState(l);
+
   const showNotif = () => {
     const upcoming = doses.find(d => d.status === 'upcoming' || d.status === 'now');
     if (!upcoming) return;
@@ -134,6 +161,8 @@ export default function App({ themeName = 'light', lang = 'es', persistKey }: Ap
     const updatedMed: Medicine = { ...med, stock: Math.max(0, med.stock - 1) };
     setDoses(ds => ds.map(x => x.id === doseId ? updatedDose : x));
     setMeds(ms => ms.map(m => m.id === d.medId ? updatedMed : m));
+    // Also update historyDoses for today so CalendarScreen stays in sync
+    setHistoryDoses(hs => hs.map(h => h.id === doseId ? { ...h, status: 'taken' as const } : h));
     setConfirm({ med, time: d.time });
     setNotif(null);
     if (userId.current) {
@@ -264,12 +293,22 @@ export default function App({ themeName = 'light', lang = 'es', persistKey }: Ap
         />
       );
     } else if (tab === 'calendar') {
-      body = <CalendarScreen theme={theme} t={t} lang={lang} meds={meds} />;
+      body = (
+        <CalendarScreen
+          theme={theme} t={t} lang={lang}
+          meds={meds}
+          doses={doses}
+          historyDoses={historyDoses}
+        />
+      );
     } else if (tab === 'profile') {
       body = (
         <ProfileScreen
           theme={theme} t={t} lang={lang}
+          themeName={themeName}
           caregivers={PATIENT_CAREGIVERS}
+          onThemeChange={setThemeName}
+          onLangChange={setLang}
           onInviteCaregiver={() => setInviteOpen(true)}
           onManageCaregiver={cg => setManageCg(cg)}
           onResetData={() => setConfirmReset(true)}
@@ -417,11 +456,10 @@ export default function App({ themeName = 'light', lang = 'es', persistKey }: Ap
           onCancel={() => setConfirmReset(false)}
           onConfirm={async () => {
             if (persistKey) dosiStore.clear(persistKey);
-            // Delete all medicines from Supabase (doses cascade)
             if (userId.current) {
               for (const m of meds) await deleteMed(m.id);
             }
-            setMeds([]); setDoses([]);
+            setMeds([]); setDoses([]); setHistoryDoses([]);
             setConfirmReset(false);
             setTab('home'); setScreen('main');
             setToast({ message: t('resetData'), kind: 'danger', icon: I.trash(16, '#fff') });
