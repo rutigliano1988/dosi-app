@@ -1,7 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const key = import.meta.env.VITE_SUPABASE_KEY as string;
+// Env vars pasted into a host dashboard can carry an invisible BOM (U+FEFF),
+// zero-width space, or smart quote. A URL / publishable key is pure printable
+// ASCII with no spaces, so strip anything else — otherwise fetch() rejects the
+// Authorization header with "String contains non ISO-8859-1 code point" and
+// every auth call fails silently.
+function cleanEnv(v: string | undefined): string {
+  return (v ?? '').replace(/[^\x21-\x7E]/g, '');
+}
+
+const url = cleanEnv(import.meta.env.VITE_SUPABASE_URL);
+const key = cleanEnv(import.meta.env.VITE_SUPABASE_KEY);
 
 export const supabase = createClient(url, key);
 

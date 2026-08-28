@@ -15,13 +15,14 @@ interface AuthSheetProps {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function mapError(msg: string, t: AuthSheetProps['t']): string {
+  console.error('[dosi] auth error:', msg);
   const m = msg.toLowerCase();
   if (m.includes('already registered') || m.includes('already been registered') || m.includes('exists')) return t('authErrExists');
   if (m.includes('signups not allowed') || m.includes('not found') || m.includes('user not found')) return t('authErrNoAccount');
-  if (m.includes('otp') || m.includes('token') || m.includes('expired') || m.includes('invalid')) return t('authErrCode');
   if (m.includes('rate') || m.includes('429') || m.includes('too many') || m.includes('only request this after') || m.includes('over_email_send_rate_limit')) return t('authErrRate');
-  if (m.includes('network') || m.includes('fetch')) return t('authErrNetwork');
-  return t('authErrCode');
+  if (m.includes('network') || m.includes('fetch') || m.includes('session missing') || m.includes('load failed') || m.includes('iso-8859')) return t('authErrNetwork');
+  if (m.includes('otp') || m.includes('token') || m.includes('expired') || (m.includes('invalid') && m.includes('code'))) return t('authErrCode');
+  return t('authErrGeneric');
 }
 
 export default function AuthSheet({ theme, t, mode, onClose, onSuccess }: AuthSheetProps) {
