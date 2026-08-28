@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getTheme, type ThemeName } from './theme/tokens';
 import { tstr, type Lang } from './i18n/strings';
-import { buildTodayDoses, shiftTime } from './lib/schedule';
+import { buildTodayDoses, shiftTime, expandTimes } from './lib/schedule';
 import { readSettings, writeSettings } from './data/settings';
 import { dosiStore } from './data/store';
 import { ensureSession, getAccount, signOutToAnon } from './lib/supabase';
@@ -122,10 +122,15 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const prevMedsCount = useRef(meds.length);
+  // Rebuild today's doses whenever any schedule-relevant field changes
+  // (pause/resume, freq, weekdays, times, duration) — not just the med count.
+  const schedSig = meds
+    .map(m => `${m.id}|${m.paused ? 1 : 0}|${m.schedule.freq}|${(m.schedule.weekdays ?? []).join(',')}|${expandTimes(m).join(',')}|${m.duration.kind}:${m.duration.days ?? ''}:${m.duration.until ?? ''}:${m.duration.startedOn}`)
+    .join(';');
+  const prevSchedSig = useRef(schedSig);
   useEffect(() => {
-    if (meds.length === prevMedsCount.current) return;
-    prevMedsCount.current = meds.length;
+    if (schedSig === prevSchedSig.current) return;
+    prevSchedSig.current = schedSig;
     setDoses(prev => {
       const fresh = buildTodayDoses(meds, new Date());
       return fresh.map(fd => {
@@ -133,7 +138,8 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         return existing ? { ...fd, status: existing.status } : fd;
       });
     });
-  }, [meds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedSig, meds]);
 
   const setThemeName = (name: ThemeName) => setThemeNameState(name);
   const setLang = (l: Lang) => setLangState(l);
