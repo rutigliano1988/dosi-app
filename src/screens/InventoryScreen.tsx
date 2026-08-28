@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine } from '../data/types';
+import { medState } from '../lib/schedule';
 import { I } from '../icons';
 import TopBar from '../components/TopBar';
 import IconBtn from '../components/IconBtn';
@@ -21,16 +22,19 @@ interface Props {
   onShowStockAlert: (med: Medicine) => void;
 }
 
-function InventoryRow({ theme, t, med, onOpen, warn }: {
+function InventoryRow({ theme, t, med, onOpen, warn, finished }: {
   theme: Theme;
   t: (key: string) => string;
   med: Medicine;
   onOpen: () => void;
   warn?: boolean;
+  finished?: boolean;
 }) {
   const dosesPerDay = med.schedule.times.length;
   const daysLeft = Math.floor(med.stock / dosesPerDay);
-  const expSoon = new Date(med.expiry).getTime() - Date.now() < 90 * 24 * 60 * 60 * 1000;
+  const expSoon = med.expiry
+    ? (new Date(med.expiry).getTime() - Date.now() < 90 * 24 * 60 * 60 * 1000)
+    : false;
 
   return (
     <div onClick={onOpen} style={{
@@ -45,8 +49,9 @@ function InventoryRow({ theme, t, med, onOpen, warn }: {
           <div style={{ fontSize: 15.5, fontWeight: 700, color: theme.text, letterSpacing: -0.2 }}>
             {med.name}
           </div>
-          {warn && <Badge theme={theme} kind="warn">{t('lowStock')}</Badge>}
-          {expSoon && !warn && <Badge theme={theme} kind="warn">{t('expSoon')}</Badge>}
+          {finished && <Badge theme={theme} kind="neutral">{t('medFinished')}</Badge>}
+          {!finished && warn && <Badge theme={theme} kind="warn">{t('lowStock')}</Badge>}
+          {!finished && expSoon && !warn && <Badge theme={theme} kind="warn">{t('expSoon')}</Badge>}
         </div>
         <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>
           {med.dose} Â· {med.schedule.times.length}Ã— / dÃ­a
@@ -90,7 +95,10 @@ export default function InventoryScreen({ theme, t, meds, onOpenMed, onAdd, onSh
   }
 
   const filtered = meds.filter(m => m.name.toLowerCase().includes(q.toLowerCase()));
-  const sorted = [...filtered].sort((a, b) => a.stock - b.stock);
+  const now = new Date();
+  const active = filtered.filter(m => medState(m, now) !== 'finished');
+  const finished = filtered.filter(m => medState(m, now) === 'finished');
+  const sorted = [...active].sort((a, b) => a.stock - b.stock);
   const lowStock = sorted.filter(m => m.stock <= 6);
   const normalStock = sorted.filter(m => m.stock > 6);
 
@@ -121,7 +129,7 @@ export default function InventoryScreen({ theme, t, meds, onOpenMed, onAdd, onSh
       </div>
 
       {/* No search results */}
-      {q.trim() && sorted.length === 0 && (
+      {q.trim() && filtered.length === 0 && (
         <div style={{ padding: '20px 28px 40px', textAlign: 'center' }}>
           <div style={{
             width: 84, height: 84, borderRadius: '50%',
@@ -164,6 +172,15 @@ export default function InventoryScreen({ theme, t, meds, onOpenMed, onAdd, onSh
         <SectionList theme={theme} title={t('inventoryTitle')}>
           {normalStock.map(m => (
             <InventoryRow key={m.id} theme={theme} t={t} med={m} onOpen={() => onOpenMed(m.id)} />
+          ))}
+        </SectionList>
+      )}
+
+      {/* Finished treatments */}
+      {finished.length > 0 && (
+        <SectionList theme={theme} title={t('invSectionFinished')}>
+          {finished.map(m => (
+            <InventoryRow key={m.id} theme={theme} t={t} med={m} finished onOpen={() => onOpenMed(m.id)} />
           ))}
         </SectionList>
       )}

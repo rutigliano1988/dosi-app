@@ -15,6 +15,7 @@ interface Props {
   theme: Theme;
   t: (key: string) => string;
   lang: Lang;
+  userName: string;
   meds: Medicine[];
   doses: Dose[];
   onMark: (doseId: string) => void;
@@ -81,20 +82,22 @@ function DoseRow({ theme, med, dose, taken, onMark, onOpen }: {
   );
 }
 
-export default function HomeScreen({ theme, t, meds, doses, onMark, onSnooze, onAddMed, onOpenMed, onShowNotif }: Props) {
+export default function HomeScreen({ theme, t, userName, meds, doses, onMark, onSnooze, onAddMed, onOpenMed, onShowNotif }: Props) {
   const hour = new Date().getHours();
-  const greet = hour < 12 ? t('greetingMorning') : hour < 19 ? t('greetingDay') : t('greetingEvening');
+  const base = hour < 12 ? 'Morning' : hour < 19 ? 'Day' : 'Evening';
+  const greet = userName ? `${t('greeting' + base)} ${userName}` : t('greeting' + base + 'Plain');
+  const barTitle = userName || t('appName');
 
   if (!meds || meds.length === 0) {
     return (
       <div style={{ paddingTop: 8, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <TopBar theme={theme} subtitle={greet} title={t('greetingName')}
+        <TopBar theme={theme} subtitle={greet} title={barTitle}
           right={<IconBtn theme={theme}>{I.bell(20, theme.text)}</IconBtn>}
         />
         <EmptyState
           theme={theme}
           icon={I.pill(56, theme.accent)}
-          title={t('emptyHomeTitle')}
+          title={t('emptyHomeTitleNew')}
           message={t('emptyHomeMsg')}
           primary={{ label: t('emptyHomeCta'), icon: I.plus(18, theme.accentText), onClick: onAddMed }}
         />
@@ -113,7 +116,7 @@ export default function HomeScreen({ theme, t, meds, doses, onMark, onSnooze, on
       <TopBar
         theme={theme}
         subtitle={greet}
-        title={t('greetingName')}
+        title={barTitle}
         right={<IconBtn theme={theme} onClick={onShowNotif} badge>{I.bell(20, theme.text)}</IconBtn>}
       />
 
