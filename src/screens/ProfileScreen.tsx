@@ -19,6 +19,8 @@ interface Props {
   onSignIn: () => void;
   onSignOut: () => void;
   onResetData: () => void;
+  pendingSync?: number;
+  onFlushSync?: () => void;
 }
 
 function SectionTitle({ theme, children }: { theme: Theme; children: React.ReactNode }) {
@@ -76,6 +78,7 @@ export default function ProfileScreen({
   theme, t, lang, themeName, userName, account,
   onUserNameChange, onThemeChange, onLangChange,
   onLinkAccount, onSignIn, onSignOut, onResetData,
+  pendingSync = 0, onFlushSync,
 }: Props) {
   const isDark = themeName === 'dark';
   const themeLabel = isDark
@@ -196,6 +199,14 @@ export default function ProfileScreen({
               <Row theme={theme} icon={I.user} label={account.email} first />
               <Row theme={theme} icon={I.back} label={t('accountSignOut')} onPress={onSignOut} danger />
             </>
+          )}
+          {pendingSync > 0 && (
+            <Row
+              theme={theme}
+              icon={I.alert}
+              label={t('syncPendingRow', { n: pendingSync })}
+              onPress={onFlushSync}
+            />
           )}
         </Card>
       </div>

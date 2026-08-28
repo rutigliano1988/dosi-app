@@ -143,6 +143,8 @@ const es: StringsMap = {
   namePlaceholderShort: 'Tu nombre',
   aboutVersion: 'v1.0',
   privacyLink: 'Política de privacidad',
+  syncPending: '{n} cambios sin sincronizar · toca para reintentar',
+  syncPendingRow: '{n} cambios sin sincronizar',
 };
 
 const en: StringsMap = {
@@ -280,6 +282,8 @@ const en: StringsMap = {
   namePlaceholderShort: 'Your name',
   aboutVersion: 'v1.0',
   privacyLink: 'Privacy policy',
+  syncPending: '{n} changes not synced · tap to retry',
+  syncPendingRow: '{n} changes not synced',
 };
 
 const STRINGS: Record<Lang, StringsMap> = { es, en };
