@@ -67,6 +67,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const [historyDoses, setHistoryDoses] = useState<Dose[]>([]);
   const [selMedId, setSelMedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Medicine | null>(null);
+  const [resumeMode, setResumeMode] = useState(false);
   const [notif, setNotif] = useState<{ med: Medicine; dose: Dose } | null>(null);
   const [confirm, setConfirm] = useState<{ med: Medicine; time: string } | null>(null);
   const [stockAlertMed, setStockAlertMed] = useState<Medicine | null>(null);
@@ -220,7 +221,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         theme={theme} t={t} lang={lang}
         mode={isEdit ? 'edit' : 'add'}
         initialData={editing}
-        onCancel={() => { setScreen(isEdit ? 'detail' : 'main'); setEditing(null); }}
+        onCancel={() => { setScreen(isEdit ? 'detail' : 'main'); setEditing(null); setResumeMode(false); }}
         onSave={d => {
           const buildSchedule = (): Medicine['schedule'] =>
             d.freq === 'interval'
@@ -241,15 +242,16 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
               name: d.name || editing.name,
               dose: d.dose, form: d.form, color: d.color,
               schedule: buildSchedule(),
-              duration: buildDuration(editing.duration.startedOn),
+              duration: buildDuration(resumeMode ? todayStr : editing.duration.startedOn),
               stock: d.stock,
               expiry: d.expiry || undefined,
               notes: d.notes || undefined,
+              paused: resumeMode ? false : editing.paused,
             };
             setMeds(ms => ms.map(m => m.id === editing.id ? updated : m));
             if (userId.current) pushMed(updated, userId.current);
             setToast({ message: t('toastSaved'), kind: 'success', icon: I.check(16, '#fff') });
-            setScreen('detail'); setEditing(null);
+            setScreen('detail'); setEditing(null); setResumeMode(false);
           } else {
             const newMed: Medicine = {
               id: crypto.randomUUID(),
@@ -263,7 +265,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
             };
             setMeds(ms => [...ms, newMed]);
             if (userId.current) pushMed(newMed, userId.current);
-            setScreen('main'); setTab('inventory');
+            setScreen('main'); setTab('inventory'); setResumeMode(false);
           }
         }}
       />
@@ -274,9 +276,11 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       <DetailScreen
         theme={theme} t={t} lang={lang}
         med={med ?? null}
+        historyDoses={historyDoses.filter(h => h.medId === selMedId)}
         onBack={() => setScreen('main')}
         onShowStockAlert={() => med && setStockAlertMed(med)}
-        onEdit={() => { if (med) { setEditing(med); setScreen('addMed'); } }}
+        onEdit={() => { if (med) { setEditing(med); setResumeMode(false); setScreen('addMed'); } }}
+        onResumeExtend={() => { if (med) { setEditing(med); setResumeMode(true); setScreen('addMed'); } }}
         onPauseToggle={() => {
           if (!med) return;
           if (med.paused) {
