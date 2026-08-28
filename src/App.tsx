@@ -25,6 +25,8 @@ import NotificationToast from './screens/NotificationToast';
 import ConfirmTakenOverlay from './screens/ConfirmTakenOverlay';
 import StockAlertSheet from './screens/StockAlertSheet';
 import AuthSheet from './screens/AuthSheet';
+import PushSheet from './screens/PushSheet';
+import { pushSupported, pushPermission, needsInstallFirst, enablePush, disablePush, syncPush } from './lib/push';
 
 export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail';
 export type TabId = 'home' | 'inventory' | 'calendar' | 'profile';
@@ -77,6 +79,22 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
     { userId: null, email: null, isAnonymous: true }
   );
   const [authSheet, setAuthSheet] = useState<'link' | 'signin' | null>(null);
+  const [pushSheet, setPushSheet] = useState(false);
+  const [pushAsked, setPushAsked] = useState<boolean>(saved.pushAsked);
+  const [pushBannerDismissed, setPushBannerDismissed] = useState<boolean>(saved.pushBannerDismissed);
+  // force pushState/showPushBanner recompute after permission change
+  const [pushTick, setPushTick] = useState(0);
+
+  void pushTick; // dependency so pushState/showPushBanner recompute after each permission change
+  const pushState: 'unsupported' | 'needs-install' | 'default' | 'granted' | 'denied' =
+    !pushSupported() ? 'unsupported'
+    : needsInstallFirst() ? 'needs-install'
+    : pushPermission() === 'granted' ? 'granted'
+    : pushPermission() === 'denied' ? 'denied'
+    : 'default';
+
+  const showPushBanner =
+    pushSupported() && !needsInstallFirst() && pushPermission() === 'default' && !pushBannerDismissed;
   const [confirmPause, setConfirmPause] = useState<Medicine | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Medicine | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -130,6 +148,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       if (!uid) return;
       userId.current = uid;
       setAccount(await getAccount());
+      if (pushPermission() === 'granted') { syncPush(uid).catch(() => {}); }
       setPendingSync(await flushOutbox(uid));
 
       const [remote, history] = await Promise.all([
@@ -187,8 +206,35 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const setThemeName = (name: ThemeName) => setThemeNameState(name);
   const setLang = (l: Lang) => setLangState(l);
 
+  const doEnablePush = async () => {
+    const uid = userId.current;
+    if (!uid) return 'denied' as const;
+    const r = await enablePush(uid);
+    setPushTick(n => n + 1);
+    if (r === 'ok') setToast({ message: t('pushEnabledToast'), kind: 'success', icon: I.check(16, '#fff') });
+    if (r === 'denied') setToast({ message: t('pushDenied'), kind: 'neutral' });
+    return r;
+  };
+
+  const doDisablePush = async () => {
+    await disablePush();
+    setPushTick(n => n + 1);
+    setToast({ message: t('pushDisabledToast'), kind: 'neutral' });
+  };
+
+  const dismissPushBanner = () => {
+    setPushBannerDismissed(true);
+    writeSettings({ pushBannerDismissed: true });
+  };
+
+  const markPushAsked = () => {
+    setPushAsked(true);
+    writeSettings({ pushAsked: true });
+  };
+
   const handleSignOut = async () => {
     if (persistKey) dosiStore.clear(persistKey);
+    await disablePush().catch(() => {});
     const uid = await signOutToAnon();
     userId.current = uid;
     clearOutbox(); setPendingSync(0);
@@ -313,6 +359,10 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
             };
             setMeds(ms => [...ms, newMed]);
             persistMed(newMed);
+            if (meds.length === 0 && !pushAsked && pushSupported() && pushPermission() === 'default') {
+              setPushSheet(true);
+            }
+            markPushAsked();
             setScreen('main'); setTab('inventory'); setResumeMode(false);
           }
         }}
@@ -354,9 +404,9 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onAddMed={() => setScreen('addMed')}
           onOpenMed={openMed}
           onShowNotif={showNotif}
-          showPushBanner={false}
-          onEnablePush={() => {}}
-          onDismissPushBanner={() => {}}
+          showPushBanner={showPushBanner}
+          onEnablePush={() => { doEnablePush(); }}
+          onDismissPushBanner={dismissPushBanner}
         />
       );
     } else if (tab === 'inventory') {
@@ -380,7 +430,6 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       );
     } else if (tab === 'profile') {
       body = (
-        // TODO Task 10: real push wiring
         <ProfileScreen
           theme={theme} t={t} lang={lang}
           themeName={themeName}
@@ -393,9 +442,9 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onSignIn={() => setAuthSheet('signin')}
           onSignOut={handleSignOut}
           onResetData={() => setConfirmReset(true)}
-          pushState="unsupported"
-          onEnablePush={() => {}}
-          onDisablePush={() => {}}
+          pushState={pushState}
+          onEnablePush={() => { doEnablePush(); }}
+          onDisablePush={() => { doDisablePush(); }}
           pendingSync={pendingSync}
           onFlushSync={flushSync}
         />
@@ -498,6 +547,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
             setAuthSheet(null);
             if (newUid && newUid !== userId.current) {
               userId.current = newUid;
+              if (pushPermission() === 'granted') { syncPush(newUid).catch(() => {}); }
               flushOutbox(newUid).then(setPendingSync);
               const [remote, history] = await Promise.all([pullAll(newUid), pullHistory(newUid, 7)]);
               const rMeds = remote?.meds ?? [];
@@ -522,6 +572,14 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
               }
             }
           }}
+        />
+      )}
+
+      {pushSheet && (
+        <PushSheet
+          theme={theme} t={t}
+          onClose={() => setPushSheet(false)}
+          onEnable={doEnablePush}
         />
       )}
 
