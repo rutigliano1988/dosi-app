@@ -200,8 +200,10 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
           ) : history.map((h, i) => {
             const isTaken = h.status === 'taken';
             const isSkipped = h.status === 'skipped';
-            const bg = isTaken ? theme.successSoft : isSkipped ? theme.dangerSoft : theme.surface2;
-            const fg = isTaken ? theme.success : isSkipped ? theme.danger : theme.textDim;
+            const isMissed = h.status === 'missed';
+            const isNeg = isSkipped || isMissed;
+            const bg = isTaken ? theme.successSoft : isNeg ? theme.dangerSoft : theme.surface2;
+            const fg = isTaken ? theme.success : isNeg ? theme.danger : theme.textDim;
             return (
               <div key={h.id + (h.date ?? '') + i} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
@@ -212,11 +214,11 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
                   background: bg, color: fg,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  {isTaken ? I.check(14, theme.success) : isSkipped ? I.close(14, theme.danger) : I.clock(13, theme.textDim)}
+                  {isTaken ? I.check(14, theme.success) : isNeg ? I.close(14, theme.danger) : I.clock(13, theme.textDim)}
                 </div>
                 <div style={{ flex: 1, fontSize: 14, color: theme.text }}>{dayLabel(h)} · {h.time}</div>
                 <div style={{ fontSize: 13, color: theme.textDim }}>
-                  {isTaken ? t('taken') : isSkipped ? t('skipDose') : ''}
+                  {isTaken ? t('taken') : isMissed ? t('missedLabel') : isSkipped ? t('skipDose') : ''}
                 </div>
               </div>
             );

@@ -178,9 +178,11 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
                 if (!med) return null;
                 const stKind = dose.status === 'taken' ? 'success'
                   : dose.status === 'skipped' ? 'danger'
+                  : dose.status === 'missed' ? 'danger'
                   : 'neutral';
                 const stLabel = dose.status === 'taken' ? t('legendDone')
                   : dose.status === 'skipped' ? (lang === 'es' ? 'Omitida' : 'Skipped')
+                  : dose.status === 'missed' ? (lang === 'es' ? 'Perdida' : 'Missed')
                   : t('legendPending');
                 return (
                   <div key={i} style={{

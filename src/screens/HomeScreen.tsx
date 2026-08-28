@@ -105,10 +105,30 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
     );
   }
 
+  if (doses.length === 0) {
+    return (
+      <div style={{ paddingTop: 8, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <TopBar theme={theme} subtitle={greet} title={barTitle}
+          right={<IconBtn theme={theme}>{I.bell(20, theme.text)}</IconBtn>}
+        />
+        <EmptyState
+          theme={theme}
+          icon={I.check(56, theme.accent)}
+          title={t('homeNothingTodayTitle')}
+          message={t('homeNothingTodayMsg')}
+        />
+      </div>
+    );
+  }
+
   const taken = doses.filter(d => d.status === 'taken');
+  const missed = doses.filter(d => d.status === 'missed');
   const upcomingDoses = doses.filter(d => d.status === 'upcoming' || d.status === 'now');
-  const nowDose = doses.find(d => d.status === 'now') ?? upcomingDoses[0];
-  const nowMed = nowDose ? meds.find(m => m.id === nowDose.medId) : null;
+  const heroDose = doses.find(d => d.status === 'now') ?? missed[0] ?? upcomingDoses[0];
+  const heroMed = heroDose ? meds.find(m => m.id === heroDose.medId) : null;
+  const heroId = heroDose?.id;
+  const upcomingRest = upcomingDoses.filter(d => d.id !== heroId);
+  const missedRest = missed.filter(d => d.id !== heroId);
   const progress = doses.length > 0 ? taken.length / doses.length : 0;
 
   return (
@@ -155,7 +175,7 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
       </div>
 
       {/* Next dose hero */}
-      {nowDose && nowMed && (
+      {heroDose && heroMed && (
         <div style={{ padding: '0 16px 18px' }}>
           <div style={{
             background: theme.accent, color: theme.accentText,
@@ -168,12 +188,14 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
                 fontSize: 12, fontWeight: 700, letterSpacing: 0.4,
                 textTransform: 'uppercase', opacity: 0.85,
               }}>
-                {nowDose.status === 'now' ? t('nowLabel') : t('nextDose')}
+                {heroDose.status === 'missed'
+                  ? t('missedLabel')
+                  : heroDose.status === 'now' ? t('nowLabel') : t('nextDose')}
                 <span>·</span>
-                {nowDose.time}
+                {heroDose.time}
               </div>
               <button
-                onClick={() => onSnooze(nowDose.id)}
+                onClick={() => onSnooze(heroDose.id)}
                 style={{
                   background: 'rgba(0,0,0,0.12)', border: 0, color: theme.accentText,
                   borderRadius: 999, padding: '4px 10px', fontSize: 11.5,
@@ -189,22 +211,22 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
                 background: 'rgba(0,0,0,0.12)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <PillGlyph color={nowMed.color} size={42} form={nowMed.form} />
+                <PillGlyph color={heroMed.color} size={42} form={heroMed.form} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{
                   fontFamily: '"Instrument Serif", Georgia, serif',
                   fontSize: 26, fontWeight: 500, letterSpacing: -0.5, lineHeight: 1.1,
                 }}>
-                  {nowMed.name}
+                  {heroMed.name}
                 </div>
                 <div style={{ fontSize: 14, opacity: 0.75, marginTop: 2 }}>
-                  {nowMed.dose}{nowMed.notes ? ` · ${nowMed.notes.split('.')[0]}` : ''}
+                  {heroMed.dose}{heroMed.notes ? ` · ${heroMed.notes.split('.')[0]}` : ''}
                 </div>
               </div>
             </div>
             <button
-              onClick={() => onMark(nowDose.id)}
+              onClick={() => onMark(heroDose.id)}
               style={{
                 width: '100%', height: 52, borderRadius: 16,
                 background: 'rgba(0,0,0,0.15)', color: theme.accentText,
@@ -219,10 +241,26 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
         </div>
       )}
 
+      {/* Missed */}
+      {missedRest.length > 0 && (
+        <SectionList theme={theme} title={t('missedSection')}>
+          {missedRest.map(d => {
+            const m = meds.find(x => x.id === d.medId);
+            if (!m) return null;
+            return (
+              <DoseRow key={d.id} theme={theme} med={m} dose={d}
+                onMark={() => onMark(d.id)}
+                onOpen={() => onOpenMed(m.id)}
+              />
+            );
+          })}
+        </SectionList>
+      )}
+
       {/* Upcoming */}
-      {upcomingDoses.length > 1 && (
+      {upcomingRest.length > 0 && (
         <SectionList theme={theme} title={t('upcoming')}>
-          {upcomingDoses.slice(1).map(d => {
+          {upcomingRest.map(d => {
             const m = meds.find(x => x.id === d.medId);
             if (!m) return null;
             return (
