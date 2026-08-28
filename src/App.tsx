@@ -209,7 +209,10 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   let body: React.ReactNode = null;
 
   if (screen === 'onboarding') {
-    body = <OnboardingScreen theme={theme} t={t} lang={lang} onDone={() => setScreen('main')} />;
+    body = <OnboardingScreen theme={theme} t={t} lang={lang} onDone={(name) => {
+      if (name) setUserName(name);
+      setScreen('main');
+    }} />;
   } else if (screen === 'addMed') {
     const isEdit = !!editing;
     body = (
