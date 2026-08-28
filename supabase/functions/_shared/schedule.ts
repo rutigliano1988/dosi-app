@@ -1,4 +1,4 @@
-import type { Medicine, Dose } from './types';
+import type { Medicine, Dose } from './types.ts';
 
 // ─── Helpers de fecha (siempre hora local del Date que se pasa) ───────────────
 

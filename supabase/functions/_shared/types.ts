@@ -44,7 +44,7 @@ export interface Dose {
   date?: string;
 }
 
-import { isoDate } from './schedule';
+import { isoDate } from './schedule.ts';
 
 // Normaliza una fila `medicines` de Supabase (schedule/duration son jsonb y
 // pueden venir en formato viejo). Equivalente a rowToMed de src/data/sync.ts.

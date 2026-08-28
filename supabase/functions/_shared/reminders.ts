@@ -1,5 +1,5 @@
-import type { Medicine } from './types';
-import { expandTimes, strToMin, daysBetween, isoDate } from './schedule';
+import type { Medicine } from './types.ts';
+import { expandTimes, strToMin, daysBetween, isoDate } from './schedule.ts';
 
 export interface DoseRow {
   time: string;

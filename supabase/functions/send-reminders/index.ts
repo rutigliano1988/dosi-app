@@ -39,9 +39,6 @@ Deno.serve(async (req: Request) => {
     )[0].timezone;
     const now = nowInTz(tz);
     const today = isoDate(now);
-    // Reloj de pared del usuario en minutos (spec §2). `dueReminder` recalcula lo
-    // suyo a partir de `now`; se deja disponible para futuros filtros del bucle.
-    const nowMin = now.getHours() * 60 + now.getMinutes();
 
     const { data: medRows } = await sb.from('medicines').select('*').eq('user_id', userId);
     const meds: Medicine[] = (medRows ?? []).map((r) => rowToMed(r as Record<string, unknown>));
@@ -105,7 +102,7 @@ Deno.serve(async (req: Request) => {
       await sb.from('doses')
         .update({
           reminded_count: ((dose.reminded_count ?? 0) as number) + 1,
-          reminded_at: new Date().toISOString(),
+          reminded_at: now.toISOString(),
         })
         .eq('id', dose.id);
     }
