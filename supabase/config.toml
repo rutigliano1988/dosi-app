@@ -1,0 +1,7 @@
+project_id = "uwcktxqrfuelmscmkhbs"
+
+[functions.send-reminders]
+verify_jwt = false
+
+[functions.dose-action]
+verify_jwt = false

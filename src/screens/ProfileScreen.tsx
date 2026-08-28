@@ -19,6 +19,9 @@ interface Props {
   onSignIn: () => void;
   onSignOut: () => void;
   onResetData: () => void;
+  pushState: 'unsupported' | 'needs-install' | 'default' | 'granted' | 'denied';
+  onEnablePush: () => void;
+  onDisablePush: () => void;
   pendingSync?: number;
   onFlushSync?: () => void;
 }
@@ -78,6 +81,7 @@ export default function ProfileScreen({
   theme, t, lang, themeName, userName, account,
   onUserNameChange, onThemeChange, onLangChange,
   onLinkAccount, onSignIn, onSignOut, onResetData,
+  pushState, onEnablePush, onDisablePush,
   pendingSync = 0, onFlushSync,
 }: Props) {
   const isDark = themeName === 'dark';
@@ -207,6 +211,24 @@ export default function ProfileScreen({
               label={t('syncPendingRow', { n: pendingSync })}
               onPress={onFlushSync}
             />
+          )}
+        </Card>
+      </div>
+
+      {/* Reminders */}
+      <div style={{ padding: '0 16px 16px' }}>
+        <SectionTitle theme={theme}>{t('pushSection')}</SectionTitle>
+        <Card theme={theme} style={{ overflow: 'hidden' }}>
+          {pushState === 'granted' ? (
+            <Row theme={theme} icon={I.bell} label={t('pushRowOn')} onPress={onDisablePush} first />
+          ) : pushState === 'default' ? (
+            <Row theme={theme} icon={I.bell} label={t('pushRowOff')} onPress={onEnablePush} first />
+          ) : pushState === 'needs-install' ? (
+            <Row theme={theme} icon={I.bell} label={t('pushRowNeedsInstall')} first />
+          ) : pushState === 'denied' ? (
+            <Row theme={theme} icon={I.bell} label={t('pushRowDenied')} first />
+          ) : (
+            <Row theme={theme} icon={I.bell} label={t('pushRowUnsupported')} first />
           )}
         </Card>
       </div>

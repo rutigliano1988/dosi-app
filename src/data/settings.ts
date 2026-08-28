@@ -6,10 +6,15 @@ export interface AppSettings {
   lang: Lang;
   userName: string;
   onboarded: boolean;
+  pushAsked: boolean;
+  pushBannerDismissed: boolean;
 }
 
 const KEY = 'dosi-settings';
-const DEFAULTS: AppSettings = { themeName: 'light', lang: 'es', userName: '', onboarded: false };
+const DEFAULTS: AppSettings = {
+  themeName: 'light', lang: 'es', userName: '', onboarded: false,
+  pushAsked: false, pushBannerDismissed: false,
+};
 
 export function readSettings(): AppSettings {
   try {
