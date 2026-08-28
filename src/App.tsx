@@ -230,12 +230,13 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         initialData={editing}
         onCancel={() => { setScreen(isEdit ? 'detail' : 'main'); setEditing(null); setResumeMode(false); }}
         onSave={d => {
+          const cleanTimes = [...new Set(d.times)].sort();
           const buildSchedule = (): Medicine['schedule'] =>
             d.freq === 'interval'
               ? { freq: 'interval', times: [d.times[0] ?? '08:00'], intervalHours: d.intervalHours }
               : d.freq === 'weekdays'
-              ? { freq: 'weekdays', times: d.times, weekdays: d.weekdays }
-              : { freq: 'daily', times: d.times };
+              ? { freq: 'weekdays', times: cleanTimes, weekdays: d.weekdays }
+              : { freq: 'daily', times: cleanTimes };
           const buildDuration = (startedOn: string): Medicine['duration'] =>
             d.duration === 'days'
               ? { kind: 'days', days: d.days, startedOn }

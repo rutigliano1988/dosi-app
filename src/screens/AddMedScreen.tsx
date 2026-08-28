@@ -160,6 +160,7 @@ function TimesEditor({ theme, t, data, upd }: { theme: Theme; t: Props['t']; dat
         }}>
           <span style={{ color: theme.textDim }}>{I.clock(18, theme.textDim)}</span>
           <input
+            type="time"
             value={time}
             onChange={e => upd('times', data.times.map((tt, j) => j === i ? e.target.value : tt))}
             style={{
@@ -251,6 +252,7 @@ function StepSchedule({ theme, t, data, upd }: { theme: Theme; t: Props['t']; da
             }}>
               <span style={{ color: theme.textDim }}>{I.clock(18, theme.textDim)}</span>
               <input
+                type="time"
                 value={first}
                 onChange={e => upd('times', [e.target.value])}
                 style={{
@@ -450,7 +452,10 @@ export default function AddMedScreen({ theme, t, mode = 'add', initialData, onCa
         <Btn
           theme={theme} kind="primary" size="md"
           onClick={() => step === STEPS - 1 ? onSave(data) : setStep(step + 1)}
-          disabled={step === 1 && data.freq === 'weekdays' && data.weekdays.length === 0}
+          disabled={step === 1 && (
+            (data.freq === 'weekdays' && data.weekdays.length === 0)
+            || (data.duration === 'until' && !data.until)
+          )}
           style={{ flex: 2 }}
         >
           {step === STEPS - 1 ? t('save') : t('next')}
