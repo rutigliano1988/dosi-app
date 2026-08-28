@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine } from '../data/types';
-import { medState } from '../lib/schedule';
+import { expandTimes, medState } from '../lib/schedule';
 import { I } from '../icons';
 import TopBar from '../components/TopBar';
 import IconBtn from '../components/IconBtn';
@@ -30,7 +30,7 @@ function InventoryRow({ theme, t, med, onOpen, warn, finished }: {
   warn?: boolean;
   finished?: boolean;
 }) {
-  const dosesPerDay = med.schedule.times.length;
+  const dosesPerDay = expandTimes(med).length;
   const daysLeft = Math.floor(med.stock / dosesPerDay);
   const expSoon = med.expiry
     ? (new Date(med.expiry).getTime() - Date.now() < 90 * 24 * 60 * 60 * 1000)
@@ -54,7 +54,7 @@ function InventoryRow({ theme, t, med, onOpen, warn, finished }: {
           {!finished && expSoon && !warn && <Badge theme={theme} kind="warn">{t('expSoon')}</Badge>}
         </div>
         <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>
-          {med.dose} Â· {med.schedule.times.length}Ã— / dÃ­a
+          {med.dose} Â· {dosesPerDay}Ã— / dÃ­a
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>

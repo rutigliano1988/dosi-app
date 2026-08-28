@@ -2,7 +2,7 @@ import type { Theme, PillColorKey } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
 import { PILL_COLORS } from '../theme/tokens';
-import { isoDate, medState, treatmentDay } from '../lib/schedule';
+import { expandTimes, isoDate, medState, treatmentDay } from '../lib/schedule';
 import { I } from '../icons';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -33,7 +33,7 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
   const treatDay = treatmentDay(med, now);
   const dayProgress = treatDay ? treatDay.current / treatDay.total : 1;
   const stockLow = med.stock <= 6;
-  const dosesPerDay = med.schedule.times.length;
+  const dosesPerDay = expandTimes(med).length;
   const daysLeft = Math.floor(med.stock / dosesPerDay);
   const formKey = `form${med.form.charAt(0).toUpperCase()}${med.form.slice(1)}` as string;
 
@@ -115,7 +115,7 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
             </button>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {med.schedule.times.map(time => (
+            {expandTimes(med).map(time => (
               <div key={time} style={{
                 background: theme.surface2, color: theme.text,
                 padding: '8px 12px', borderRadius: 12, fontWeight: 700,

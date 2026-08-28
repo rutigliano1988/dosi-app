@@ -450,6 +450,7 @@ export default function AddMedScreen({ theme, t, mode = 'add', initialData, onCa
         <Btn
           theme={theme} kind="primary" size="md"
           onClick={() => step === STEPS - 1 ? onSave(data) : setStep(step + 1)}
+          disabled={step === 1 && data.freq === 'weekdays' && data.weekdays.length === 0}
           style={{ flex: 2 }}
         >
           {step === STEPS - 1 ? t('save') : t('next')}
