@@ -231,22 +231,20 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
 
   const snoozeDose = (doseId: string) => {
     setNotif(null);
-    setDoses(ds => ds.map(x => {
-      if (x.id !== doseId) return x;
-      const updated = { ...x, time: shiftTime(x.time, 10) };
-      persistDose(updated);
-      return updated;
-    }));
+    const target = doses.find(x => x.id === doseId);
+    if (!target) return;
+    const updated = { ...target, time: shiftTime(target.time, 10) };
+    setDoses(ds => ds.map(x => x.id === doseId ? updated : x));
+    persistDose(updated);
   };
 
   const skipDose = (doseId: string) => {
     setNotif(null);
-    setDoses(ds => ds.map(x => {
-      if (x.id !== doseId) return x;
-      const updated = { ...x, status: 'skipped' as const };
-      persistDose(updated);
-      return updated;
-    }));
+    const target = doses.find(x => x.id === doseId);
+    if (!target) return;
+    const updated: Dose = { ...target, status: 'skipped' };
+    setDoses(ds => ds.map(x => x.id === doseId ? updated : x));
+    persistDose(updated);
   };
 
   const openMed = (medId: string) => { setSelMedId(medId); setScreen('detail'); };

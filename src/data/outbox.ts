@@ -24,9 +24,8 @@ export function clearOutbox(): void { write([]); }
 /** Replay queued ops in order. Stop at the first failure, keeping it and the rest.
  *  Returns the number of ops still pending afterward. */
 export async function flushOutbox(userId: string): Promise<number> {
-  let ops = read();
-  while (ops.length > 0) {
-    const op = ops[0];
+  while (read().length > 0) {
+    const op = read()[0];
     try {
       if (op.t === 'med') await pushMed(op.med, userId);
       else if (op.t === 'dose') await pushDose(op.dose, userId);
@@ -34,8 +33,11 @@ export async function flushOutbox(userId: string): Promise<number> {
     } catch {
       break; // keep op + remainder for the next flush
     }
-    ops = ops.slice(1);
-    write(ops);
+    // Re-read: a concurrent enqueue during the await appends to the tail, so
+    // dropping index 0 here (the op we just completed) never clobbers it.
+    const cur = read();
+    cur.shift();
+    write(cur);
   }
-  return ops.length;
+  return read().length;
 }
