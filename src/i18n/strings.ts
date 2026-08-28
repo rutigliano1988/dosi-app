@@ -130,6 +130,16 @@ const es: StringsMap = {
   authLinkedToast: 'Cuenta guardada',
   authSignedInToast: 'Sesión iniciada',
   signedOutToast: 'Sesión cerrada',
+  accountSection: 'Cuenta',
+  accountAnon: 'Sin cuenta guardada',
+  accountSaveCta: 'Guardar mi cuenta',
+  accountSignInCta: 'Iniciar sesión en otra cuenta',
+  accountSignOut: 'Cerrar sesión',
+  persistWarning: 'Tus datos se guardan solo en este navegador. Guarda tu cuenta con un email para no perderlos si cambias de dispositivo.',
+  editName: 'Editar nombre',
+  namePlaceholderShort: 'Tu nombre',
+  aboutVersion: 'v1.0',
+  privacyLink: 'Política de privacidad',
 };
 
 const en: StringsMap = {
@@ -252,6 +262,16 @@ const en: StringsMap = {
   authLinkedToast: 'Account saved',
   authSignedInToast: 'Signed in',
   signedOutToast: 'Signed out',
+  accountSection: 'Account',
+  accountAnon: 'No account saved',
+  accountSaveCta: 'Save my account',
+  accountSignInCta: 'Sign in to another account',
+  accountSignOut: 'Sign out',
+  persistWarning: 'Your data is saved only in this browser. Save your account with an email so you don’t lose it if you switch devices.',
+  editName: 'Edit name',
+  namePlaceholderShort: 'Your name',
+  aboutVersion: 'v1.0',
+  privacyLink: 'Privacy policy',
 };
 
 const STRINGS: Record<Lang, StringsMap> = { es, en };
