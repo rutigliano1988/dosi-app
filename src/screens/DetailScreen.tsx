@@ -24,7 +24,25 @@ interface Props {
 }
 
 export default function DetailScreen({ theme, t, med, historyDoses, onBack, onShowStockAlert, onEdit, onResumeExtend, onPauseToggle, onDelete }: Props) {
-  if (!med) return null;
+  if (!med) {
+    return (
+      <div style={{ padding: '8px 16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <button onClick={onBack} style={{
+          width: 42, height: 42, borderRadius: 14, background: theme.surface,
+          border: `1px solid ${theme.border}`, color: theme.text, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {I.back(20, theme.text)}
+        </button>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center', color: theme.textDim, fontSize: 15, padding: '40px 24px',
+        }}>
+          {t('medNotFound')}
+        </div>
+      </div>
+    );
+  }
 
   const now = new Date();
   const c = PILL_COLORS[med.color as PillColorKey] ?? { dot: '#ccc', soft: '#eee' };
