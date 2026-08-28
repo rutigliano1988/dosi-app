@@ -56,7 +56,7 @@ export async function pushMed(med: Medicine, userId: string) {
     notes:    med.notes ?? null,
     paused:   med.paused ?? false,
   }, { onConflict: 'id' });
-  if (error) console.error('[dosi] pushMed error:', error.message);
+  if (error) throw new Error(error.message);
 }
 
 export async function pushMeds(meds: Medicine[], userId: string) {
@@ -83,7 +83,7 @@ export async function pushMeds(meds: Medicine[], userId: string) {
 
 export async function deleteMed(id: string) {
   const { error } = await supabase.from('medicines').delete().eq('id', id);
-  if (error) console.error('[dosi] deleteMed error:', error.message);
+  if (error) throw new Error(error.message);
 }
 
 // ─── Doses ───────────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ export async function pushDose(dose: Dose, userId: string) {
     total_min: dose.totalMin,
     status:    dose.status,
   }, { onConflict: 'id' });
-  if (error) console.error('[dosi] pushDose error:', error.message);
+  if (error) throw new Error(error.message);
 }
 
 export async function pushDoses(doses: Dose[], userId: string) {
