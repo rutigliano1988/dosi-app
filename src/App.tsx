@@ -222,13 +222,29 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         initialData={editing}
         onCancel={() => { setScreen(isEdit ? 'detail' : 'main'); setEditing(null); }}
         onSave={d => {
+          const buildSchedule = (): Medicine['schedule'] =>
+            d.freq === 'interval'
+              ? { freq: 'interval', times: [d.times[0] ?? '08:00'], intervalHours: d.intervalHours }
+              : d.freq === 'weekdays'
+              ? { freq: 'weekdays', times: d.times, weekdays: d.weekdays }
+              : { freq: 'daily', times: d.times };
+          const buildDuration = (startedOn: string): Medicine['duration'] =>
+            d.duration === 'days'
+              ? { kind: 'days', days: d.days, startedOn }
+              : d.duration === 'until'
+              ? { kind: 'until', until: d.until, startedOn }
+              : { kind: 'ongoing', startedOn };
+
           if (isEdit && editing) {
             const updated: Medicine = {
               ...editing,
               name: d.name || editing.name,
               dose: d.dose, form: d.form, color: d.color,
-              schedule: { ...editing.schedule, freq: d.freq, times: d.times },
-              stock: d.stock, expiry: d.expiry, notes: d.notes,
+              schedule: buildSchedule(),
+              duration: buildDuration(editing.duration.startedOn),
+              stock: d.stock,
+              expiry: d.expiry || undefined,
+              notes: d.notes || undefined,
             };
             setMeds(ms => ms.map(m => m.id === editing.id ? updated : m));
             if (userId.current) pushMed(updated, userId.current);
@@ -237,13 +253,13 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           } else {
             const newMed: Medicine = {
               id: crypto.randomUUID(),
-              name: d.name || 'Nueva medicina',
+              name: d.name || t('addMed'),
               dose: d.dose, form: d.form, color: d.color,
-              schedule: { freq: d.freq, times: d.times },
-              duration: d.duration === 'forDays'
-                ? { kind: 'days', days: d.days, startedOn: todayStr }
-                : { kind: 'ongoing', startedOn: todayStr },
-              stock: d.stock, expiry: d.expiry, notes: d.notes,
+              schedule: buildSchedule(),
+              duration: buildDuration(todayStr),
+              stock: d.stock,
+              expiry: d.expiry || undefined,
+              notes: d.notes || undefined,
             };
             setMeds(ms => [...ms, newMed]);
             if (userId.current) pushMed(newMed, userId.current);
