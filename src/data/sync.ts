@@ -1,15 +1,13 @@
 import { supabase } from '../lib/supabase';
+import { isoDate } from '../lib/schedule';
 import type { Medicine, Dose, FreqKind, DurationKind } from './types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+// Fechas SIEMPRE en local (isoDate). Nunca toISOString() → desplaza el día en
+// zonas UTC-negativas y las dosis de la tarde se guardan bajo el día siguiente.
 
 function isoToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return isoDate(new Date());
 }
 
 // Normaliza una fila de Supabase (schedule/duration son jsonb, pueden venir en formato viejo)
@@ -95,7 +93,7 @@ export async function pushDose(dose: Dose, userId: string) {
     id:        dose.id,
     user_id:   userId,
     med_id:    dose.medId,
-    date:      todayISO(),
+    date:      isoToday(),
     time:      dose.time,
     total_min: dose.totalMin,
     status:    dose.status,
@@ -105,7 +103,7 @@ export async function pushDose(dose: Dose, userId: string) {
 
 export async function pushDoses(doses: Dose[], userId: string) {
   if (doses.length === 0) return;
-  const today = todayISO();
+  const today = isoToday();
   const { error } = await supabase.from('doses').upsert(
     doses.map(d => ({
       id:        d.id,
@@ -128,7 +126,7 @@ export async function pullHistory(userId: string, days = 7): Promise<import('./t
   for (let i = 0; i < days; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().slice(0, 10));
+    dates.push(isoDate(d));
   }
 
   const { data, error } = await supabase
@@ -159,7 +157,7 @@ interface PullResult {
 }
 
 export async function pullAll(userId: string): Promise<PullResult | null> {
-  const today = todayISO();
+  const today = isoToday();
 
   const [medsRes, dosesRes] = await Promise.all([
     supabase.from('medicines').select('*').eq('user_id', userId),

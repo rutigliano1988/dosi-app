@@ -3,6 +3,7 @@ import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import { tArr } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
+import { isoDate } from '../lib/schedule';
 import TopBar from '../components/TopBar';
 import Card from '../components/Card';
 import SectionList from '../components/SectionList';
@@ -18,10 +19,6 @@ interface Props {
   meds: Medicine[];
   doses: Dose[];         // today's live doses
   historyDoses: Dose[];  // last 7 days from Supabase (have .date field)
-}
-
-function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
 }
 
 function buildWeek() {
