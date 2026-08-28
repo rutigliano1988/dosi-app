@@ -432,14 +432,27 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
             if (newUid && newUid !== userId.current) {
               userId.current = newUid;
               const [remote, history] = await Promise.all([pullAll(newUid), pullHistory(newUid, 7)]);
-              setMeds(remote?.meds ?? []);
-              setDoses(remote?.doses ?? buildTodayDoses(remote?.meds ?? [], new Date()));
+              const rMeds = remote?.meds ?? [];
+              const rDoses = (remote?.doses && remote.doses.length > 0)
+                ? remote.doses
+                : buildTodayDoses(rMeds, new Date());
+              setMeds(rMeds);
+              setDoses(rDoses);
               setHistoryDoses(history);
+              if ((!remote?.doses || remote.doses.length === 0) && rMeds.length > 0) {
+                pushDoses(rDoses, newUid);
+              }
+              setAccount(await getAccount());
               setToast({ message: t('authSignedInToast'), kind: 'success', icon: I.check(16, '#fff') });
             } else {
-              setToast({ message: t('authLinkedToast'), kind: 'success', icon: I.check(16, '#fff') });
+              const acc = await getAccount();
+              setAccount(acc);
+              if (acc.email && !acc.isAnonymous) {
+                setToast({ message: t('authLinkedToast'), kind: 'success', icon: I.check(16, '#fff') });
+              } else {
+                setToast({ message: t('authLinkPending'), kind: 'neutral' });
+              }
             }
-            setAccount(await getAccount());
           }}
         />
       )}
