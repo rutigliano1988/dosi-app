@@ -67,7 +67,7 @@ export async function enablePush(
 ): Promise<'ok' | 'denied' | 'unsupported' | 'needs-install' | 'error'> {
   if (!pushSupported()) return 'unsupported';
   if (needsInstallFirst()) return 'needs-install';
-  if (!VAPID_PUBLIC_KEY) return 'unsupported';
+  if (!VAPID_PUBLIC_KEY) { console.error('[dosi] enablePush: VITE_VAPID_PUBLIC_KEY is not set'); return 'error'; }
 
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') return 'denied';
@@ -116,10 +116,14 @@ export async function syncPush(userId: string): Promise<void> {
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
   if (!sub) { await enablePush(userId); return; }
-  await supabase.from('push_subscriptions')
-    .update({
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      last_seen_at: new Date().toISOString(),
-    })
+  const { count } = await supabase.from('push_subscriptions')
+    .update(
+      {
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        last_seen_at: new Date().toISOString(),
+      },
+      { count: 'exact' },
+    )
     .eq('endpoint', sub.endpoint);
+  if (!count) await upsertSubscription(userId, sub); // row vanished (GC'd) — re-insert
 }

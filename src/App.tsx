@@ -84,15 +84,15 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const [pushBannerDismissed, setPushBannerDismissed] = useState<boolean>(saved.pushBannerDismissed);
   // force pushState/showPushBanner recompute after permission change
   const [pushTick, setPushTick] = useState(0);
-  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState<boolean | null>(null);
 
   void pushTick; // dependency so pushState/showPushBanner recompute after each permission change
-  const _perm = pushPermission();
+  const perm = pushPermission();
   const pushState: 'unsupported' | 'needs-install' | 'default' | 'granted' | 'denied' =
     !pushSupported() ? 'unsupported'
     : needsInstallFirst() ? 'needs-install'
-    : _perm === 'denied' ? 'denied'
-    : _perm === 'granted' && pushSubscribed ? 'granted'
+    : perm === 'denied' ? 'denied'
+    : perm === 'granted' && pushSubscribed !== false ? 'granted'
     : 'default';
 
   const showPushBanner =
@@ -209,6 +209,10 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const setLang = (l: Lang) => setLangState(l);
 
   const refreshPushSubscribed = () => { pushHasSubscription().then(setPushSubscribed); };
+
+  // Resolve push subscription state independent of the auth boot, so an
+  // already-enabled user does not flash "reminders off" on cold load / offline.
+  useEffect(() => { refreshPushSubscribed(); }, []);
 
   const doEnablePush = async () => {
     const uid = userId.current;
@@ -558,7 +562,8 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
               if (pushPermission() === 'granted') {
                 (async () => {
                   await disablePush().catch(() => {});   // unsubscribes browser sub; row delete may RLS-fail (dead endpoint, GC'd by send-reminders 404)
-                  await enablePush(newUid).catch(() => {}); // fresh subscribe -> new endpoint -> clean insert under newUid
+                  const r = await enablePush(newUid).catch(() => 'error' as const); // fresh subscribe -> new endpoint -> clean insert under newUid
+                  if (r !== 'ok') setToast({ message: t('pushErrorGeneric'), kind: 'danger' });
                   refreshPushSubscribed();
                 })();
               }
