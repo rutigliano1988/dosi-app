@@ -125,6 +125,7 @@ const es: StringsMap = {
   authErrNetwork: 'Sin conexión. Revisa tu internet e inténtalo otra vez.',
   authLinkedToast: 'Cuenta guardada',
   authSignedInToast: 'Sesión iniciada',
+  signedOutToast: 'Sesión cerrada',
 };
 
 const en: StringsMap = {
@@ -242,6 +243,7 @@ const en: StringsMap = {
   authErrNetwork: 'No connection. Check your internet and try again.',
   authLinkedToast: 'Account saved',
   authSignedInToast: 'Signed in',
+  signedOutToast: 'Signed out',
 };
 
 const STRINGS: Record<Lang, StringsMap> = { es, en };

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getTheme, type ThemeName } from './theme/tokens';
 import { tstr, type Lang } from './i18n/strings';
-import { INITIAL_MEDS, PATIENT_CAREGIVERS } from './data/mock';
-import { buildTodayDoses, shiftTime } from './data/buildTodayDoses';
+import { buildTodayDoses, shiftTime } from './lib/schedule';
+import { readSettings, writeSettings } from './data/settings';
 import { dosiStore } from './data/store';
-import { ensureSession } from './lib/supabase';
-import { pullAll, pullHistory, pushMeds, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
-import type { Medicine, Dose, Caregiver } from './data/types';
+import { ensureSession, getAccount, signOutToAnon } from './lib/supabase';
+import { pullAll, pullHistory, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
+import type { Medicine, Dose } from './data/types';
 import { I } from './icons';
 
 import BottomNav from './components/BottomNav';
@@ -23,21 +23,10 @@ import DetailScreen from './screens/DetailScreen';
 import NotificationToast from './screens/NotificationToast';
 import ConfirmTakenOverlay from './screens/ConfirmTakenOverlay';
 import StockAlertSheet from './screens/StockAlertSheet';
-import InviteCaregiverSheet from './screens/InviteCaregiverSheet';
-import ManageCaregiverSheet from './screens/ManageCaregiverSheet';
+import AuthSheet from './screens/AuthSheet';
 
 export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail';
 export type TabId = 'home' | 'inventory' | 'calendar' | 'profile';
-
-const SETTINGS_KEY = 'dosi-settings';
-
-function readSettings(): { themeName?: ThemeName; lang?: Lang } {
-  try {
-    const s = localStorage.getItem(SETTINGS_KEY);
-    if (s) return JSON.parse(s);
-  } catch {}
-  return {};
-}
 
 interface AppProps {
   themeName?: ThemeName;
@@ -56,6 +45,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
 
   const [themeName, setThemeNameState] = useState<ThemeName>(saved.themeName ?? initialTheme);
   const [lang, setLangState] = useState<Lang>(saved.lang ?? initialLang);
+  const [userName, setUserName] = useState<string>(saved.userName ?? '');
 
   const theme = getTheme(themeName);
   const t = (key: string, vars?: Record<string, string | number>) => tstr(lang, key, vars);
@@ -63,10 +53,10 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const stored = persistKey ? dosiStore.read(persistKey) : null;
   const todayStr = dosiStore.todayStr();
 
-  const startMeds = stored?.meds ?? INITIAL_MEDS;
+  const startMeds = stored?.meds ?? [];
   const startDoses = (stored?.doses && stored.date === todayStr)
     ? stored.doses
-    : buildTodayDoses(startMeds, new Date().getHours(), { autoMarkTaken: !persistKey });
+    : buildTodayDoses(startMeds, new Date());
 
   const userId = useRef<string | null>(null);
 
@@ -81,8 +71,10 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const [confirm, setConfirm] = useState<{ med: Medicine; time: string } | null>(null);
   const [stockAlertMed, setStockAlertMed] = useState<Medicine | null>(null);
   const stockAlertShown = useRef(new Set<string>());
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [manageCg, setManageCg] = useState<Caregiver | null>(null);
+  const [account, setAccount] = useState<{ userId: string | null; email: string | null; isAnonymous: boolean }>(
+    { userId: null, email: null, isAnonymous: true }
+  );
+  const [authSheet, setAuthSheet] = useState<'link' | 'signin' | null>(null);
   const [confirmPause, setConfirmPause] = useState<Medicine | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Medicine | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -90,8 +82,8 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
 
   // Persist settings changes
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ themeName, lang }));
-  }, [themeName, lang]);
+    writeSettings({ themeName, lang, userName });
+  }, [themeName, lang, userName]);
 
   useEffect(() => {
     if (!persistKey) return;
@@ -104,6 +96,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       const uid = await ensureSession();
       if (!uid) return;
       userId.current = uid;
+      setAccount(await getAccount());
 
       const [remote, history] = await Promise.all([
         pullAll(uid),
@@ -117,14 +110,13 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         if (remote.doses.length > 0) {
           setDoses(remote.doses);
         } else {
-          const fresh = buildTodayDoses(remote.meds, new Date().getHours());
+          const fresh = buildTodayDoses(remote.meds, new Date());
           setDoses(fresh);
           pushDoses(fresh, uid);
         }
-      } else {
-        await pushMeds(startMeds, uid);
-        await pushDoses(startDoses, uid);
       }
+      // sin else: remoto vacío → el usuario empieza vacío; el primer pushMed
+      // ocurre cuando crea su primera medicina
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -134,16 +126,26 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
     if (meds.length === prevMedsCount.current) return;
     prevMedsCount.current = meds.length;
     setDoses(prev => {
-      const fresh = buildTodayDoses(meds, new Date().getHours(), { autoMarkTaken: !persistKey });
+      const fresh = buildTodayDoses(meds, new Date());
       return fresh.map(fd => {
         const existing = prev.find(p => p.medId === fd.medId && p.time === fd.time);
         return existing ? { ...fd, status: existing.status } : fd;
       });
     });
-  }, [meds, persistKey]);
+  }, [meds]);
 
   const setThemeName = (name: ThemeName) => setThemeNameState(name);
   const setLang = (l: Lang) => setLangState(l);
+
+  const handleSignOut = async () => {
+    if (persistKey) dosiStore.clear(persistKey);
+    const uid = await signOutToAnon();
+    userId.current = uid;
+    setMeds([]); setDoses([]); setHistoryDoses([]);
+    setAccount(await getAccount());
+    setTab('home'); setScreen('main');
+    setToast({ message: t('signedOutToast'), kind: 'neutral' });
+  };
 
   const showNotif = () => {
     const upcoming = doses.find(d => d.status === 'upcoming' || d.status === 'now');
@@ -236,8 +238,8 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
               dose: d.dose, form: d.form, color: d.color,
               schedule: { freq: d.freq, times: d.times },
               duration: d.duration === 'forDays'
-                ? { kind: 'days', days: d.days, startedDay: 1 }
-                : { kind: 'ongoing' },
+                ? { kind: 'days', days: d.days, startedOn: todayStr }
+                : { kind: 'ongoing', startedOn: todayStr },
               stock: d.stock, expiry: d.expiry, notes: d.notes,
             };
             setMeds(ms => [...ms, newMed]);
@@ -275,6 +277,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       body = (
         <HomeScreen
           theme={theme} t={t} lang={lang}
+          userName={userName}
           meds={meds} doses={doses}
           onMark={markTaken} onSnooze={snoozeDose} onSkip={skipDose}
           onAddMed={() => setScreen('addMed')}
@@ -306,22 +309,15 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         <ProfileScreen
           theme={theme} t={t} lang={lang}
           themeName={themeName}
-          caregivers={PATIENT_CAREGIVERS}
+          userName={userName}
+          account={account}
+          onUserNameChange={setUserName}
           onThemeChange={setThemeName}
           onLangChange={setLang}
-          onInviteCaregiver={() => setInviteOpen(true)}
-          onManageCaregiver={cg => setManageCg(cg)}
+          onLinkAccount={() => setAuthSheet('link')}
+          onSignIn={() => setAuthSheet('signin')}
+          onSignOut={handleSignOut}
           onResetData={() => setConfirmReset(true)}
-          onLoadDemo={() => {
-            const freshDoses = buildTodayDoses(INITIAL_MEDS, new Date().getHours(), { autoMarkTaken: true });
-            setMeds(INITIAL_MEDS);
-            setDoses(freshDoses);
-            if (userId.current) {
-              pushMeds(INITIAL_MEDS, userId.current);
-              pushDoses(freshDoses, userId.current);
-            }
-            setToast({ message: t('loadDemo'), kind: 'success', icon: I.check(16, '#fff') });
-          }}
         />
       );
     }
@@ -396,12 +392,26 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         />
       )}
 
-      {inviteOpen && (
-        <InviteCaregiverSheet theme={theme} t={t} lang={lang} onClose={() => setInviteOpen(false)} />
-      )}
-
-      {manageCg && (
-        <ManageCaregiverSheet theme={theme} t={t} lang={lang} caregiver={manageCg} onClose={() => setManageCg(null)} />
+      {authSheet && (
+        <AuthSheet
+          theme={theme} t={t}
+          mode={authSheet}
+          onClose={() => setAuthSheet(null)}
+          onSuccess={async ({ userId: newUid }) => {
+            setAuthSheet(null);
+            if (newUid && newUid !== userId.current) {
+              userId.current = newUid;
+              const [remote, history] = await Promise.all([pullAll(newUid), pullHistory(newUid, 7)]);
+              setMeds(remote?.meds ?? []);
+              setDoses(remote?.doses ?? buildTodayDoses(remote?.meds ?? [], new Date()));
+              setHistoryDoses(history);
+              setToast({ message: t('authSignedInToast'), kind: 'success', icon: I.check(16, '#fff') });
+            } else {
+              setToast({ message: t('authLinkedToast'), kind: 'success', icon: I.check(16, '#fff') });
+            }
+            setAccount(await getAccount());
+          }}
+        />
       )}
 
       {confirmPause && (
