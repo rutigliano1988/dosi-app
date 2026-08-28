@@ -54,7 +54,7 @@ function InventoryRow({ theme, t, med, onOpen, warn, finished }: {
           {!finished && expSoon && !warn && <Badge theme={theme} kind="warn">{t('expSoon')}</Badge>}
         </div>
         <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2 }}>
-          {med.dose} Â· {dosesPerDay}Ã— / dÃ­a
+          {med.dose} · {dosesPerDay}× / día
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>

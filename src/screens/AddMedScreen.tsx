@@ -314,7 +314,7 @@ function StepStock({ theme, t, data, upd }: { theme: Theme; t: Props['t']; data:
           <button onClick={() => upd('stock', Math.max(0, data.stock - 1))} style={{
             width: 50, height: 50, borderRadius: 14, border: `1px solid ${theme.borderStrong}`,
             background: theme.surface, color: theme.text, fontSize: 22, fontWeight: 600, cursor: 'pointer',
-          }}>âˆ’</button>
+          }}>−</button>
           <div style={{
             flex: 1, height: 50, borderRadius: 14, background: theme.surface,
             border: `1px solid ${theme.borderStrong}`,

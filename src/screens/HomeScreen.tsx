@@ -169,7 +169,7 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
                 textTransform: 'uppercase', opacity: 0.85,
               }}>
                 {nowDose.status === 'now' ? t('nowLabel') : t('nextDose')}
-                <span>Â·</span>
+                <span>·</span>
                 {nowDose.time}
               </div>
               <button
@@ -199,7 +199,7 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
                   {nowMed.name}
                 </div>
                 <div style={{ fontSize: 14, opacity: 0.75, marginTop: 2 }}>
-                  {nowMed.dose}{nowMed.notes ? ` Â· ${nowMed.notes.split('.')[0]}` : ''}
+                  {nowMed.dose}{nowMed.notes ? ` · ${nowMed.notes.split('.')[0]}` : ''}
                 </div>
               </div>
             </div>

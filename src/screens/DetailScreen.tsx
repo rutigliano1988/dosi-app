@@ -93,7 +93,7 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
               {isFinished && <Badge theme={theme} kind="neutral">{t('medFinished')}</Badge>}
             </div>
             <div style={{ color: 'rgba(28,24,18,0.65)', fontSize: 14, fontWeight: 500, marginTop: 4 }}>
-              {med.dose} Â· {t(formKey)}
+              {med.dose} · {t(formKey)}
             </div>
           </div>
         </div>
@@ -158,7 +158,7 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
               {med.stock}
             </div>
             <div style={{ color: theme.textDim, fontSize: 14, fontWeight: 500 }}>
-              {t('pillsLeft')} Â· {t('enoughFor')} {daysLeft} {t('daysOf')}
+              {t('pillsLeft')} · {t('enoughFor')} {daysLeft} {t('daysOf')}
             </div>
           </div>
           <div style={{ marginTop: 10, height: 6, borderRadius: 3, background: theme.surface2, overflow: 'hidden' }}>
@@ -214,7 +214,7 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
                 }}>
                   {isTaken ? I.check(14, theme.success) : isSkipped ? I.close(14, theme.danger) : I.clock(13, theme.textDim)}
                 </div>
-                <div style={{ flex: 1, fontSize: 14, color: theme.text }}>{dayLabel(h)} Â· {h.time}</div>
+                <div style={{ flex: 1, fontSize: 14, color: theme.text }}>{dayLabel(h)} · {h.time}</div>
                 <div style={{ fontSize: 13, color: theme.textDim }}>
                   {isTaken ? t('taken') : isSkipped ? t('skipDose') : ''}
                 </div>
