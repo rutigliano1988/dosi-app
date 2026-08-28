@@ -60,7 +60,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
 
   const userId = useRef<string | null>(null);
 
-  const [screen, setScreen] = useState<ScreenId>('onboarding');
+  const [screen, setScreen] = useState<ScreenId>(saved.onboarded ? 'main' : 'onboarding');
   const [tab, setTab] = useState<TabId>('home');
   const [meds, setMeds] = useState<Medicine[]>(startMeds);
   const [doses, setDoses] = useState<Dose[]>(startDoses);
@@ -218,6 +218,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   if (screen === 'onboarding') {
     body = <OnboardingScreen theme={theme} t={t} lang={lang} onDone={(name) => {
       if (name) setUserName(name);
+      writeSettings({ onboarded: true });
       setScreen('main');
     }} />;
   } else if (screen === 'addMed') {
