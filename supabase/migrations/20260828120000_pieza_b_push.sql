@@ -16,6 +16,7 @@ create table if not exists public.push_subscriptions (
 
 alter table public.push_subscriptions enable row level security;
 
+drop policy if exists "own subs" on public.push_subscriptions;
 create policy "own subs" on public.push_subscriptions
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -32,6 +33,7 @@ create table if not exists public.sent_alerts (
 
 alter table public.sent_alerts enable row level security;
 
+drop policy if exists "own alerts" on public.sent_alerts;
 create policy "own alerts" on public.sent_alerts
   for select using (auth.uid() = user_id);
 

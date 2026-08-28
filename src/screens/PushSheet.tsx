@@ -4,7 +4,7 @@ import { I } from '../icons';
 import Btn from '../components/Btn';
 import { needsInstallFirst } from '../lib/push';
 
-type EnableResult = 'ok' | 'denied' | 'unsupported' | 'needs-install';
+type EnableResult = 'ok' | 'denied' | 'unsupported' | 'needs-install' | 'error';
 
 interface PushSheetProps {
   theme: Theme;
@@ -26,7 +26,8 @@ export default function PushSheet({ theme, t, onClose, onEnable }: PushSheetProp
       if (r === 'ok') { onClose(); return; }
       if (r === 'needs-install') { setErr(t('pushInstallBody')); return; }
       if (r === 'denied') { setErr(t('pushDenied')); return; }
-      setErr(t('pushUnsupported'));
+      if (r === 'unsupported') { setErr(t('pushUnsupported')); return; }
+      setErr(t('pushErrorGeneric'));
     } finally {
       setBusy(false);
     }

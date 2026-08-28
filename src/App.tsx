@@ -26,7 +26,7 @@ import ConfirmTakenOverlay from './screens/ConfirmTakenOverlay';
 import StockAlertSheet from './screens/StockAlertSheet';
 import AuthSheet from './screens/AuthSheet';
 import PushSheet from './screens/PushSheet';
-import { pushSupported, pushPermission, needsInstallFirst, enablePush, disablePush, syncPush } from './lib/push';
+import { pushSupported, pushPermission, needsInstallFirst, enablePush, disablePush, syncPush, pushHasSubscription } from './lib/push';
 
 export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail';
 export type TabId = 'home' | 'inventory' | 'calendar' | 'profile';
@@ -84,17 +84,19 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const [pushBannerDismissed, setPushBannerDismissed] = useState<boolean>(saved.pushBannerDismissed);
   // force pushState/showPushBanner recompute after permission change
   const [pushTick, setPushTick] = useState(0);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
 
   void pushTick; // dependency so pushState/showPushBanner recompute after each permission change
+  const _perm = pushPermission();
   const pushState: 'unsupported' | 'needs-install' | 'default' | 'granted' | 'denied' =
     !pushSupported() ? 'unsupported'
     : needsInstallFirst() ? 'needs-install'
-    : pushPermission() === 'granted' ? 'granted'
-    : pushPermission() === 'denied' ? 'denied'
+    : _perm === 'denied' ? 'denied'
+    : _perm === 'granted' && pushSubscribed ? 'granted'
     : 'default';
 
   const showPushBanner =
-    pushSupported() && !needsInstallFirst() && pushPermission() === 'default' && !pushBannerDismissed;
+    pushSupported() && !needsInstallFirst() && pushState === 'default' && !pushBannerDismissed;
   const [confirmPause, setConfirmPause] = useState<Medicine | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Medicine | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -148,7 +150,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       if (!uid) return;
       userId.current = uid;
       setAccount(await getAccount());
-      if (pushPermission() === 'granted') { syncPush(uid).catch(() => {}); }
+      if (pushPermission() === 'granted') { syncPush(uid).catch(() => {}).then(refreshPushSubscribed); }
       setPendingSync(await flushOutbox(uid));
 
       const [remote, history] = await Promise.all([
@@ -206,19 +208,24 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const setThemeName = (name: ThemeName) => setThemeNameState(name);
   const setLang = (l: Lang) => setLangState(l);
 
+  const refreshPushSubscribed = () => { pushHasSubscription().then(setPushSubscribed); };
+
   const doEnablePush = async () => {
     const uid = userId.current;
     if (!uid) return 'denied' as const;
     const r = await enablePush(uid);
     setPushTick(n => n + 1);
+    refreshPushSubscribed();
     if (r === 'ok') setToast({ message: t('pushEnabledToast'), kind: 'success', icon: I.check(16, '#fff') });
     if (r === 'denied') setToast({ message: t('pushDenied'), kind: 'neutral' });
+    if (r === 'error') setToast({ message: t('pushErrorGeneric'), kind: 'danger' });
     return r;
   };
 
   const doDisablePush = async () => {
     await disablePush();
     setPushTick(n => n + 1);
+    refreshPushSubscribed();
     setToast({ message: t('pushDisabledToast'), kind: 'neutral' });
   };
 
@@ -235,6 +242,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const handleSignOut = async () => {
     if (persistKey) dosiStore.clear(persistKey);
     await disablePush().catch(() => {});
+    setPushSubscribed(false);
     const uid = await signOutToAnon();
     userId.current = uid;
     clearOutbox(); setPendingSync(0);
@@ -547,7 +555,13 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
             setAuthSheet(null);
             if (newUid && newUid !== userId.current) {
               userId.current = newUid;
-              if (pushPermission() === 'granted') { syncPush(newUid).catch(() => {}); }
+              if (pushPermission() === 'granted') {
+                (async () => {
+                  await disablePush().catch(() => {});   // unsubscribes browser sub; row delete may RLS-fail (dead endpoint, GC'd by send-reminders 404)
+                  await enablePush(newUid).catch(() => {}); // fresh subscribe -> new endpoint -> clean insert under newUid
+                  refreshPushSubscribed();
+                })();
+              }
               flushOutbox(newUid).then(setPendingSync);
               const [remote, history] = await Promise.all([pullAll(newUid), pullHistory(newUid, 7)]);
               const rMeds = remote?.meds ?? [];

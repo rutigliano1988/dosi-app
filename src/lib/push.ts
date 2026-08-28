@@ -64,25 +64,39 @@ async function upsertSubscription(userId: string, sub: PushSubscription): Promis
 
 export async function enablePush(
   userId: string,
-): Promise<'ok' | 'denied' | 'unsupported' | 'needs-install'> {
+): Promise<'ok' | 'denied' | 'unsupported' | 'needs-install' | 'error'> {
   if (!pushSupported()) return 'unsupported';
   if (needsInstallFirst()) return 'needs-install';
+  if (!VAPID_PUBLIC_KEY) return 'unsupported';
 
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') return 'denied';
 
-  const reg = await navigator.serviceWorker.ready;
-  const existing = await reg.pushManager.getSubscription();
-  const sub = existing ?? await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    // TS 6.0 lib.dom: Uint8Array is generic over its buffer; the helper's
-    // `Uint8Array` (ArrayBufferLike) needs a nudge to the `BufferSource`
-    // PushManager wants. Cast to satisfy strict TS + lib.dom typing.
-    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
-  });
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    const sub = existing ?? await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      // TS 6.0 lib.dom: Uint8Array is generic over its buffer; the helper's
+      // `Uint8Array` (ArrayBufferLike) needs a nudge to the `BufferSource`
+      // PushManager wants. Cast to satisfy strict TS + lib.dom typing.
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
+    });
 
-  await upsertSubscription(userId, sub);
-  return 'ok';
+    await upsertSubscription(userId, sub);
+    return 'ok';
+  } catch (e) {
+    console.error('[dosi] enablePush', e);
+    return 'error';
+  }
+}
+
+export async function pushHasSubscription(): Promise<boolean> {
+  if (!pushSupported()) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    return (await reg.pushManager.getSubscription()) != null;
+  } catch { return false; }
 }
 
 export async function disablePush(): Promise<void> {
@@ -101,9 +115,11 @@ export async function syncPush(userId: string): Promise<void> {
   if (!pushSupported() || pushPermission() !== 'granted') return;
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
-  if (!sub) {
-    await enablePush(userId); // el permiso ya está concedido; re-suscribe en silencio
-    return;
-  }
-  await upsertSubscription(userId, sub);
+  if (!sub) { await enablePush(userId); return; }
+  await supabase.from('push_subscriptions')
+    .update({
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      last_seen_at: new Date().toISOString(),
+    })
+    .eq('endpoint', sub.endpoint);
 }

@@ -15,7 +15,7 @@ self.addEventListener('push', (event) => {
       icon: '/pwa-192x192.png',
       badge: '/pwa-192x192.png',
       tag: d.tag,
-      renotify: true,
+      renotify: Boolean(d.tag),
       data: d,
       actions,
     })
@@ -34,7 +34,9 @@ self.addEventListener('notificationclick', (event) => {
         body: JSON.stringify({
           endpoint: d.endpoint, secret: d.secret, doseId: d.doseId, action: event.action,
         }),
-      }).catch(() => self.clients.openWindow('/'))
+      })
+        .then((r) => { if (!r.ok) return self.clients.openWindow('/'); })
+        .catch(() => self.clients.openWindow('/'))
     );
     return;
   }

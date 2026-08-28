@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as browser from './schedule';
 import * as shared from '../../supabase/functions/_shared/schedule';
+import { rowToMed } from '../../supabase/functions/_shared/types.ts';
 import type { Medicine } from '../data/types';
 
 function med(over: Partial<Medicine> = {}): Medicine {
@@ -105,5 +106,58 @@ describe('nowInTz', () => {
   it('tz inválida → devuelve base', () => {
     const base = new Date('2026-01-15T20:00:00Z');
     expect(shared.nowInTz('Not/AZone', base).getTime()).toBe(base.getTime());
+  });
+});
+
+// Este bloque refleja `rowToMed` de src/data/sync.ts — ambos deben mantenerse
+// sincronizados (Deno no ve src/, por eso la copia en _shared/types.ts).
+describe('rowToMed (_shared)', () => {
+  it('normaliza una fila nueva-formato completa', () => {
+    const m = rowToMed({
+      id: 'abc',
+      name: 'Ibuprofeno',
+      dose: '400 mg',
+      form: 'capsule',
+      color: 'ocean',
+      schedule: { freq: 'interval', times: ['09:00'], weekdays: [1, 3], intervalHours: 8 },
+      duration: { kind: 'days', days: 7, until: '2026-09-10', startedOn: '2026-08-20' },
+      stock: 42,
+      expiry: '2027-01-01',
+      notes: 'Con comida.',
+      paused: true,
+    });
+    expect(m).toEqual({
+      id: 'abc',
+      name: 'Ibuprofeno',
+      dose: '400 mg',
+      form: 'capsule',
+      color: 'ocean',
+      schedule: { freq: 'interval', times: ['09:00'], weekdays: [1, 3], intervalHours: 8 },
+      duration: { kind: 'days', days: 7, until: '2026-09-10', startedOn: '2026-08-20' },
+      stock: 42,
+      expiry: '2027-01-01',
+      notes: 'Con comida.',
+      paused: true,
+    });
+  });
+
+  it('rellena defaults sensatos para una fila vieja/dispersa', () => {
+    const m = rowToMed({ id: 'x' });
+    expect(m.name).toBe('');
+    expect(m.form).toBe('pill');
+    expect(m.color).toBe('coral');
+    expect(m.schedule.freq).toBe('daily');
+    expect(m.schedule.times).toEqual(['08:00']);
+    expect(m.schedule.weekdays).toBeUndefined();
+    expect(m.duration.kind).toBe('ongoing');
+    expect(m.duration.startedOn).toBe(shared.isoDate(new Date()));
+    expect(m.stock).toBe(0);
+    expect(m.paused).toBe(false);
+  });
+
+  it('paused: solo el booleano true cuenta', () => {
+    expect(rowToMed({ id: 'x', paused: 'yes' }).paused).toBe(false);
+    expect(rowToMed({ id: 'x', paused: false }).paused).toBe(false);
+    expect(rowToMed({ id: 'x', paused: true }).paused).toBe(true);
   });
 });

@@ -33,6 +33,7 @@ Deno.serve(async (req: Request) => {
   let pushes = 0;
 
   for (const [userId, userSubs] of byUser) {
+   try {
     // Zona horaria: la de la suscripción vista más recientemente.
     const tz = [...userSubs].sort(
       (a, b) => Date.parse(b.last_seen_at) - Date.parse(a.last_seen_at),
@@ -40,7 +41,8 @@ Deno.serve(async (req: Request) => {
     const now = nowInTz(tz);
     const today = isoDate(now);
 
-    const { data: medRows } = await sb.from('medicines').select('*').eq('user_id', userId);
+    const { data: medRows, error: medErr } = await sb.from('medicines').select('*').eq('user_id', userId);
+    if (medErr) { console.error('[send-reminders] medicines', userId, medErr); continue; }
     const meds: Medicine[] = (medRows ?? []).map((r) => rowToMed(r as Record<string, unknown>));
 
     // 1) Materializar las dosis de hoy. `ignoreDuplicates` => nunca pisa
@@ -62,8 +64,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // 2) Avisos de toma.
-    const { data: dosesHoy } = await sb
+    const { data: dosesHoy, error: dosesErr } = await sb
       .from('doses').select('*').eq('user_id', userId).eq('date', today);
+    if (dosesErr) { console.error('[send-reminders] doses', userId, dosesErr); continue; }
 
     for (const dose of dosesHoy ?? []) {
       const doseRow = {
@@ -173,6 +176,9 @@ Deno.serve(async (req: Request) => {
           .eq('user_id', userId).eq('med_id', med.id).eq('kind', 'expiry');
       }
     }
+   } catch (e) {
+     console.error('[send-reminders]', userId, e);
+   }
   }
 
   return new Response(JSON.stringify({ users: byUser.size, pushes }), {
