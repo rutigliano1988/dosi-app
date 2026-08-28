@@ -380,6 +380,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       );
     } else if (tab === 'profile') {
       body = (
+        // TODO Task 10: real push wiring
         <ProfileScreen
           theme={theme} t={t} lang={lang}
           themeName={themeName}
@@ -392,6 +393,9 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onSignIn={() => setAuthSheet('signin')}
           onSignOut={handleSignOut}
           onResetData={() => setConfirmReset(true)}
+          pushState="unsupported"
+          onEnablePush={() => {}}
+          onDisablePush={() => {}}
           pendingSync={pendingSync}
           onFlushSync={flushSync}
         />
