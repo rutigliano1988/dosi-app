@@ -62,6 +62,13 @@ describe('expandTimes', () => {
   it('daily devuelve times ordenado', () => {
     expect(expandTimes(med({ schedule: { freq: 'daily', times: ['20:00', '08:00'] } }))).toEqual(['08:00', '20:00']);
   });
+  it('de-duplica horas idénticas', () => {
+    expect(expandTimes(med({ schedule: { freq: 'daily', times: ['08:00', '08:00', '20:00'] } }))).toEqual(['08:00', '20:00']);
+  });
+  it('descarta entradas con formato inválido', () => {
+    expect(expandTimes(med({ schedule: { freq: 'daily', times: ['08:00', 'xx'] } }))).toEqual(['08:00']);
+    expect(expandTimes(med({ schedule: { freq: 'daily', times: ['08:00', '8', '25:00', '08:99'] } }))).toEqual(['08:00']);
+  });
   it('interval 8h desde 08:00 → 3 tomas', () => {
     expect(expandTimes(med({ schedule: { freq: 'interval', times: ['08:00'], intervalHours: 8 } })))
       .toEqual(['00:00', '08:00', '16:00']);
@@ -124,7 +131,37 @@ describe('buildTodayDoses', () => {
     ];
     const doses = buildTodayDoses(meds, now);
     expect(doses.map(d => d.time)).toEqual(['08:00', '12:00', '20:00']);
-    expect(doses.map(d => d.id)).toEqual(['a-08:00', 'b-12:00', 'a-20:00']);
+    expect(doses.map(d => d.id)).toEqual(['a-2026-08-28-08:00', 'b-2026-08-28-12:00', 'a-2026-08-28-20:00']);
+  });
+
+  it('el id incluye la fecha local de "now" (medId-YYYY-MM-DD-HH:MM)', () => {
+    const doses = buildTodayDoses([med({ id: 'a', schedule: { freq: 'daily', times: ['08:00'] } })], now);
+    expect(doses[0].id).toMatch(/^a-\d{4}-\d{2}-\d{2}-\d{2}:\d{2}$/);
+    expect(doses[0].id).toBe('a-2026-08-28-08:00');
+  });
+
+  it('dos fechas distintas para la misma med/hora producen ids distintos', () => {
+    const m = med({ id: 'a', schedule: { freq: 'daily', times: ['08:00'] } });
+    const d1 = buildTodayDoses([m], new Date(2026, 7, 28, 8, 5))[0];
+    const d2 = buildTodayDoses([m], new Date(2026, 7, 29, 8, 5))[0];
+    expect(d1.id).toBe('a-2026-08-28-08:00');
+    expect(d2.id).toBe('a-2026-08-29-08:00');
+    expect(d1.id).not.toBe(d2.id);
+  });
+
+  it('marca "missed" las dosis muy pasadas', () => {
+    const noche = new Date(2026, 7, 28, 22, 0); // 22:00
+    const m = med({ id: 'a', schedule: { freq: 'daily', times: ['08:00', '22:15', '23:30'] } });
+    const doses = buildTodayDoses([m], noche);
+    expect(doses.find(d => d.time === '08:00')!.status).toBe('missed');
+    expect(doses.find(d => d.time === '22:15')!.status).toBe('now');
+    expect(doses.find(d => d.time === '23:30')!.status).toBe('upcoming');
+  });
+
+  it('ignora horas con formato inválido al construir dosis', () => {
+    const m = med({ id: 'a', schedule: { freq: 'daily', times: ['08:00', 'abc'] } });
+    const doses = buildTodayDoses([m], now);
+    expect(doses.map(d => d.time)).toEqual(['08:00']);
   });
 
   it('marca "now" las dosis dentro de ±30 min y "upcoming" el resto', () => {

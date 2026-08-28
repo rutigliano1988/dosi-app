@@ -99,7 +99,7 @@ export async function pushDose(dose: Dose, userId: string) {
     time:      dose.time,
     total_min: dose.totalMin,
     status:    dose.status,
-  }, { onConflict: 'user_id,med_id,date,time' });
+  }, { onConflict: 'id' });
   if (error) console.error('[dosi] pushDose error:', error.message);
 }
 
@@ -116,7 +116,7 @@ export async function pushDoses(doses: Dose[], userId: string) {
       total_min: d.totalMin,
       status:    d.status,
     })),
-    { onConflict: 'user_id,med_id,date,time' },
+    { onConflict: 'id' },
   );
   if (error) console.error('[dosi] pushDoses error:', error.message);
 }

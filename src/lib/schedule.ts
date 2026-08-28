@@ -31,6 +31,12 @@ function strToMin(hhmm: string): number {
   return h * 60 + m;
 }
 
+function isValidHHMM(t: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(t)) return false;
+  const [h, m] = t.split(':').map(Number);
+  return h >= 0 && h < 24 && m >= 0 && m < 60;
+}
+
 // ─── Estado de un tratamiento ────────────────────────────────────────────────
 
 export function medState(med: Medicine, today: Date): 'active' | 'paused' | 'finished' {
@@ -49,16 +55,18 @@ export function medState(med: Medicine, today: Date): 'active' | 'paused' | 'fin
 
 export function expandTimes(med: Medicine): string[] {
   const s = med.schedule;
+  let list: string[];
   if (s.freq === 'interval' && s.intervalHours && s.times[0]) {
     const anchor = strToMin(s.times[0]);
     const n = Math.floor(24 / s.intervalHours);
-    const out: string[] = [];
+    list = [];
     for (let k = 0; k < n; k++) {
-      out.push(minToStr(anchor + k * s.intervalHours * 60));
+      list.push(minToStr(anchor + k * s.intervalHours * 60));
     }
-    return out.sort();
+  } else {
+    list = [...s.times];
   }
-  return [...s.times].sort();
+  return [...new Set(list.filter(isValidHHMM))].sort();
 }
 
 export function isActiveOn(med: Medicine, day: Date): boolean {
@@ -88,9 +96,12 @@ export function buildTodayDoses(meds: Medicine[], now: Date): Dose[] {
     if (!isActiveOn(m, now)) continue;
     for (const t of expandTimes(m)) {
       const totalMin = strToMin(t);
+      if (Number.isNaN(totalMin)) continue;
       const status: Dose['status'] =
-        totalMin >= nowMin - 30 && totalMin < nowMin + 30 ? 'now' : 'upcoming';
-      doses.push({ id: `${m.id}-${t}`, medId: m.id, time: t, totalMin, status });
+        totalMin < nowMin - 30 ? 'missed'
+        : totalMin < nowMin + 30 ? 'now'
+        : 'upcoming';
+      doses.push({ id: `${m.id}-${isoDate(now)}-${t}`, medId: m.id, time: t, totalMin, status });
     }
   }
   return doses.sort((a, b) => a.totalMin - b.totalMin);

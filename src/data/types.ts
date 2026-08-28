@@ -1,7 +1,7 @@
 import type { PillColorKey } from '../theme/tokens';
 
 export type MedForm = 'capsule' | 'pill' | 'syrup' | 'injection' | 'drops';
-export type DoseStatus = 'upcoming' | 'now' | 'taken' | 'skipped';
+export type DoseStatus = 'upcoming' | 'now' | 'taken' | 'skipped' | 'missed';
 export type FreqKind = 'daily' | 'weekdays' | 'interval';
 export type DurationKind = 'ongoing' | 'days' | 'until';
 
@@ -35,7 +35,7 @@ export interface Medicine {
 }
 
 export interface Dose {
-  id: string;                    // `${medId}-${time}`
+  id: string;                    // `${medId}-${YYYY-MM-DD}-${time}` (fecha local)
   medId: string;
   time: string;
   totalMin: number;
