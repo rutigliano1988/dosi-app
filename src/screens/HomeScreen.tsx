@@ -24,6 +24,9 @@ interface Props {
   onAddMed: () => void;
   onOpenMed: (medId: string) => void;
   onShowNotif: () => void;
+  showPushBanner: boolean;
+  onEnablePush: () => void;
+  onDismissPushBanner: () => void;
 }
 
 function DoseRow({ theme, med, dose, taken, onMark, onOpen }: {
@@ -82,7 +85,42 @@ function DoseRow({ theme, med, dose, taken, onMark, onOpen }: {
   );
 }
 
-export default function HomeScreen({ theme, t, userName, meds, doses, onMark, onSnooze, onAddMed, onOpenMed, onShowNotif }: Props) {
+function PushBanner({ theme, t, onEnable, onDismiss }: {
+  theme: Theme;
+  t: (key: string) => string;
+  onEnable: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div style={{ padding: '0 16px 16px' }}>
+      <div style={{
+        background: theme.accentSoft, borderRadius: 18, padding: 16,
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+      }}>
+        <div style={{ flexShrink: 0, marginTop: 2 }}>{I.bell(20, theme.accent)}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: theme.text }}>{t('pushBannerTitle')}</div>
+          <div style={{ fontSize: 13, color: theme.textDim, marginTop: 2, lineHeight: 1.4 }}>{t('pushBannerBody')}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button onClick={onEnable} style={{
+              background: theme.accent, color: theme.accentText, border: 0, borderRadius: 999,
+              padding: '7px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}>{t('pushBannerCta')}</button>
+            <button onClick={onDismiss} style={{
+              background: 'transparent', color: theme.textDim, border: 0,
+              padding: '7px 10px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+            }}>{t('skip')}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function HomeScreen({
+  theme, t, userName, meds, doses, onMark, onSnooze, onAddMed, onOpenMed, onShowNotif,
+  showPushBanner, onEnablePush, onDismissPushBanner,
+}: Props) {
   const hour = new Date().getHours();
   const base = hour < 12 ? 'Morning' : hour < 19 ? 'Day' : 'Evening';
   const greet = userName ? `${t('greeting' + base)} ${userName}` : t('greeting' + base + 'Plain');
@@ -94,6 +132,9 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
         <TopBar theme={theme} subtitle={greet} title={barTitle}
           right={<IconBtn theme={theme}>{I.bell(20, theme.text)}</IconBtn>}
         />
+        {showPushBanner && (
+          <PushBanner theme={theme} t={t} onEnable={onEnablePush} onDismiss={onDismissPushBanner} />
+        )}
         <EmptyState
           theme={theme}
           icon={I.pill(56, theme.accent)}
@@ -111,6 +152,9 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
         <TopBar theme={theme} subtitle={greet} title={barTitle}
           right={<IconBtn theme={theme}>{I.bell(20, theme.text)}</IconBtn>}
         />
+        {showPushBanner && (
+          <PushBanner theme={theme} t={t} onEnable={onEnablePush} onDismiss={onDismissPushBanner} />
+        )}
         <EmptyState
           theme={theme}
           icon={I.check(56, theme.accent)}
@@ -139,6 +183,10 @@ export default function HomeScreen({ theme, t, userName, meds, doses, onMark, on
         title={barTitle}
         right={<IconBtn theme={theme} onClick={onShowNotif} badge>{I.bell(20, theme.text)}</IconBtn>}
       />
+
+      {showPushBanner && (
+        <PushBanner theme={theme} t={t} onEnable={onEnablePush} onDismiss={onDismissPushBanner} />
+      )}
 
       {/* Progress card */}
       <div style={{ padding: '0 16px 16px' }}>

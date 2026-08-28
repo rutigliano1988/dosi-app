@@ -354,6 +354,9 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onAddMed={() => setScreen('addMed')}
           onOpenMed={openMed}
           onShowNotif={showNotif}
+          showPushBanner={false}
+          onEnablePush={() => {}}
+          onDismissPushBanner={() => {}}
         />
       );
     } else if (tab === 'inventory') {
