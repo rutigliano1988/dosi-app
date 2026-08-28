@@ -2,11 +2,22 @@
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import webpush from 'npm:web-push@3';
 
-webpush.setVapidDetails(
-  Deno.env.get('VAPID_SUBJECT') ?? 'mailto:rutigliano2@gmail.com',
-  Deno.env.get('VAPID_PUBLIC_KEY') ?? '',
-  Deno.env.get('VAPID_PRIVATE_KEY') ?? '',
-);
+// VAPID se configura de forma perezosa (no en la carga del módulo): así, si los
+// secretos aún no están puestos, la función responde 401/200 en vez de 500 en
+// cada arranque; solo el envío real falla hasta que se configuran.
+let vapidReady = false;
+function ensureVapid(): boolean {
+  if (vapidReady) return true;
+  const pub = Deno.env.get('VAPID_PUBLIC_KEY') ?? '';
+  const priv = Deno.env.get('VAPID_PRIVATE_KEY') ?? '';
+  if (!pub || !priv) {
+    console.error('[edge] VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY no configurados');
+    return false;
+  }
+  webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') ?? 'mailto:rutigliano2@gmail.com', pub, priv);
+  vapidReady = true;
+  return true;
+}
 
 /** Cliente Supabase con la service-role key (salta RLS). */
 export function sbAdmin(): SupabaseClient {
@@ -26,6 +37,7 @@ export interface PushRow {
 
 /** Envía una notificación. Devuelve 0 si fue bien, o el statusCode HTTP si falló. */
 export async function webpushSend(sub: PushRow, payloadJson: string): Promise<number> {
+  if (!ensureVapid()) return 500;
   try {
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
