@@ -1,7 +1,8 @@
 import type { Theme, PillColorKey } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
-import type { Medicine } from '../data/types';
+import type { Medicine, Dose } from '../data/types';
 import { PILL_COLORS } from '../theme/tokens';
+import { expandTimes, isoDate, medState, treatmentDay } from '../lib/schedule';
 import { I } from '../icons';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -13,31 +14,56 @@ interface Props {
   t: (key: string, vars?: Record<string, string | number>) => string;
   lang: Lang;
   med: Medicine | null;
+  historyDoses: Dose[];
   onBack: () => void;
   onShowStockAlert: () => void;
   onEdit: () => void;
+  onResumeExtend: () => void;
   onPauseToggle: () => void;
   onDelete: () => void;
 }
 
-export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, onEdit, onPauseToggle, onDelete }: Props) {
-  if (!med) return null;
+export default function DetailScreen({ theme, t, med, historyDoses, onBack, onShowStockAlert, onEdit, onResumeExtend, onPauseToggle, onDelete }: Props) {
+  if (!med) {
+    return (
+      <div style={{ padding: '8px 16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <button onClick={onBack} style={{
+          width: 42, height: 42, borderRadius: 14, background: theme.surface,
+          border: `1px solid ${theme.border}`, color: theme.text, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {I.back(20, theme.text)}
+        </button>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center', color: theme.textDim, fontSize: 15, padding: '40px 24px',
+        }}>
+          {t('medNotFound')}
+        </div>
+      </div>
+    );
+  }
 
+  const now = new Date();
   const c = PILL_COLORS[med.color as PillColorKey] ?? { dot: '#ccc', soft: '#eee' };
-  const dur = med.duration;
-  const dayProgress = dur.kind === 'days' && dur.days && dur.startedDay
-    ? dur.startedDay / dur.days : 1;
+  const state = medState(med, now);
+  const isFinished = state === 'finished';
+  const treatDay = treatmentDay(med, now);
+  const dayProgress = treatDay ? treatDay.current / treatDay.total : 1;
   const stockLow = med.stock <= 6;
-  const dosesPerDay = med.schedule.times.length;
+  const dosesPerDay = expandTimes(med).length;
   const daysLeft = Math.floor(med.stock / dosesPerDay);
   const formKey = `form${med.form.charAt(0).toUpperCase()}${med.form.slice(1)}` as string;
 
-  const mockHistory = [
-    { day: 'Hoy',  time: '08:00', taken: true  },
-    { day: 'Ayer', time: '20:00', taken: true  },
-    { day: 'Ayer', time: '14:00', taken: true  },
-    { day: 'Ayer', time: '08:00', taken: false },
-  ];
+  const isoToday = isoDate(now);
+  const isoYesterday = isoDate(new Date(now.getTime() - 86_400_000));
+  const history = [...historyDoses]
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || b.totalMin - a.totalMin)
+    .slice(0, 10);
+  const dayLabel = (d: Dose) =>
+    d.date === isoToday ? t('historyToday')
+    : d.date === isoYesterday ? t('historyYesterday')
+    : (d.date ?? '');
 
   return (
     <div style={{ paddingBottom: 100 }}>
@@ -51,14 +77,6 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
             backdropFilter: 'blur(8px)',
           }}>
             {I.back(20, '#1c1812')}
-          </button>
-          <button style={{
-            width: 42, height: 42, borderRadius: 14,
-            background: 'rgba(255,255,255,0.6)', border: 0, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backdropFilter: 'blur(8px)',
-          }}>
-            {I.more(20, '#1c1812')}
           </button>
         </div>
 
@@ -87,11 +105,13 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
             <div style={{
               fontFamily: '"Instrument Serif", Georgia, serif',
               fontSize: 30, fontWeight: 500, letterSpacing: -0.6, color: '#1c1812', lineHeight: 1.05,
+              display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
             }}>
               {med.name}
+              {isFinished && <Badge theme={theme} kind="neutral">{t('medFinished')}</Badge>}
             </div>
             <div style={{ color: 'rgba(28,24,18,0.65)', fontSize: 14, fontWeight: 500, marginTop: 4 }}>
-              {med.dose} Â· {t(formKey)}
+              {med.dose} · {t(formKey)}
             </div>
           </div>
         </div>
@@ -113,7 +133,7 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
             </button>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {med.schedule.times.map(time => (
+            {expandTimes(med).map(time => (
               <div key={time} style={{
                 background: theme.surface2, color: theme.text,
                 padding: '8px 12px', borderRadius: 12, fontWeight: 700,
@@ -125,12 +145,12 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
               </div>
             ))}
           </div>
-          {dur.kind === 'days' && dur.startedDay && dur.days && (
+          {treatDay && (
             <div style={{ marginTop: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                 <div style={{ fontSize: 13, color: theme.textDim, fontWeight: 500 }}>{t('duration')}</div>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: theme.text }}>
-                  {t('step')} {dur.startedDay} {t('of')} {dur.days}
+                  {treatDay.current} / {treatDay.total}
                 </div>
               </div>
               <div style={{ height: 6, borderRadius: 3, background: theme.surface2, overflow: 'hidden' }}>
@@ -156,7 +176,7 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
               {med.stock}
             </div>
             <div style={{ color: theme.textDim, fontSize: 14, fontWeight: 500 }}>
-              {t('pillsLeft')} Â· {t('enoughFor')} {daysLeft} {t('daysOf')}
+              {t('pillsLeft')} · {t('enoughFor')} {daysLeft} {t('daysOf')}
             </div>
           </div>
           <div style={{ marginTop: 10, height: 6, borderRadius: 3, background: theme.surface2, overflow: 'hidden' }}>
@@ -166,7 +186,7 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
             }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12.5, color: theme.textDim }}>
-            <span>{t('expiresOn')} {med.expiry}</span>
+            <span>{med.expiry ? `${t('expiresOn')} ${med.expiry}` : ''}</span>
             <button onClick={onShowStockAlert} style={{
               background: 'transparent', border: 0, color: theme.accent,
               cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 12.5,
@@ -191,33 +211,50 @@ export default function DetailScreen({ theme, t, med, onBack, onShowStockAlert, 
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.textDim, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>
             {t('history')}
           </div>
-          {mockHistory.map((h, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
-              borderBottom: i < mockHistory.length - 1 ? `1px solid ${theme.border}` : 'none',
-            }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: 9,
-                background: h.taken ? theme.successSoft : theme.dangerSoft,
-                color: h.taken ? theme.success : theme.danger,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {h.taken ? I.check(14, theme.success) : I.close(14, theme.danger)}
-              </div>
-              <div style={{ flex: 1, fontSize: 14, color: theme.text }}>{h.day} Â· {h.time}</div>
-              <div style={{ fontSize: 13, color: theme.textDim }}>
-                {h.taken ? t('taken') : t('skipDose')}
-              </div>
+          {history.length === 0 ? (
+            <div style={{ textAlign: 'center', color: theme.textDim, fontSize: 14, padding: '14px 0' }}>
+              {t('noHistoryYet')}
             </div>
-          ))}
+          ) : history.map((h, i) => {
+            const isTaken = h.status === 'taken';
+            const isSkipped = h.status === 'skipped';
+            const isMissed = h.status === 'missed';
+            const isNeg = isSkipped || isMissed;
+            const bg = isTaken ? theme.successSoft : isNeg ? theme.dangerSoft : theme.surface2;
+            const fg = isTaken ? theme.success : isNeg ? theme.danger : theme.textDim;
+            return (
+              <div key={h.id + (h.date ?? '') + i} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
+                borderBottom: i < history.length - 1 ? `1px solid ${theme.border}` : 'none',
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 9,
+                  background: bg, color: fg,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {isTaken ? I.check(14, theme.success) : isNeg ? I.close(14, theme.danger) : I.clock(13, theme.textDim)}
+                </div>
+                <div style={{ flex: 1, fontSize: 14, color: theme.text }}>{dayLabel(h)} · {h.time}</div>
+                <div style={{ fontSize: 13, color: theme.textDim }}>
+                  {isTaken ? t('taken') : isMissed ? t('missedLabel') : isSkipped ? t('skipDose') : ''}
+                </div>
+              </div>
+            );
+          })}
         </Card>
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <Btn theme={theme} kind="secondary" size="md" style={{ flex: 1 }} onClick={onPauseToggle}>
-            {med.paused ? I.check(16, theme.text) : I.pause(16, theme.text)}
-            {med.paused ? t('detailResume') : t('pause')}
-          </Btn>
+          {isFinished ? (
+            <Btn theme={theme} kind="primary" size="md" style={{ flex: 1 }} onClick={onResumeExtend}>
+              {t('resumeExtend')}
+            </Btn>
+          ) : (
+            <Btn theme={theme} kind="secondary" size="md" style={{ flex: 1 }} onClick={onPauseToggle}>
+              {med.paused ? I.check(16, theme.text) : I.pause(16, theme.text)}
+              {med.paused ? t('detailResume') : t('pause')}
+            </Btn>
+          )}
           <Btn theme={theme} kind="danger" size="md" style={{ flex: 1 }} onClick={onDelete}>
             {I.trash(16, theme.danger)} {t('delete')}
           </Btn>

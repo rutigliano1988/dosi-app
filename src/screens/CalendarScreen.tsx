@@ -3,6 +3,7 @@ import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import { tArr } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
+import { isoDate } from '../lib/schedule';
 import TopBar from '../components/TopBar';
 import Card from '../components/Card';
 import SectionList from '../components/SectionList';
@@ -18,10 +19,6 @@ interface Props {
   meds: Medicine[];
   doses: Dose[];         // today's live doses
   historyDoses: Dose[];  // last 7 days from Supabase (have .date field)
-}
-
-function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
 }
 
 function buildWeek() {
@@ -181,9 +178,11 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
                 if (!med) return null;
                 const stKind = dose.status === 'taken' ? 'success'
                   : dose.status === 'skipped' ? 'danger'
+                  : dose.status === 'missed' ? 'danger'
                   : 'neutral';
                 const stLabel = dose.status === 'taken' ? t('legendDone')
                   : dose.status === 'skipped' ? (lang === 'es' ? 'Omitida' : 'Skipped')
+                  : dose.status === 'missed' ? (lang === 'es' ? 'Perdida' : 'Missed')
                   : t('legendPending');
                 return (
                   <div key={i} style={{

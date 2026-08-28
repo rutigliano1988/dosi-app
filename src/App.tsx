@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getTheme, type ThemeName } from './theme/tokens';
 import { tstr, type Lang } from './i18n/strings';
-import { INITIAL_MEDS, PATIENT_CAREGIVERS } from './data/mock';
-import { buildTodayDoses, shiftTime } from './data/buildTodayDoses';
+import { buildTodayDoses, shiftTime, expandTimes } from './lib/schedule';
+import { readSettings, writeSettings } from './data/settings';
 import { dosiStore } from './data/store';
-import { ensureSession } from './lib/supabase';
-import { pullAll, pullHistory, pushMeds, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
-import type { Medicine, Dose, Caregiver } from './data/types';
+import { ensureSession, getAccount, signOutToAnon } from './lib/supabase';
+import { pullAll, pullHistory, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
+import { enqueue, outboxSize, clearOutbox, flushOutbox } from './data/outbox';
+import type { Medicine, Dose } from './data/types';
 import { I } from './icons';
 
 import BottomNav from './components/BottomNav';
@@ -23,21 +24,10 @@ import DetailScreen from './screens/DetailScreen';
 import NotificationToast from './screens/NotificationToast';
 import ConfirmTakenOverlay from './screens/ConfirmTakenOverlay';
 import StockAlertSheet from './screens/StockAlertSheet';
-import InviteCaregiverSheet from './screens/InviteCaregiverSheet';
-import ManageCaregiverSheet from './screens/ManageCaregiverSheet';
+import AuthSheet from './screens/AuthSheet';
 
 export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail';
 export type TabId = 'home' | 'inventory' | 'calendar' | 'profile';
-
-const SETTINGS_KEY = 'dosi-settings';
-
-function readSettings(): { themeName?: ThemeName; lang?: Lang } {
-  try {
-    const s = localStorage.getItem(SETTINGS_KEY);
-    if (s) return JSON.parse(s);
-  } catch {}
-  return {};
-}
 
 interface AppProps {
   themeName?: ThemeName;
@@ -56,6 +46,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
 
   const [themeName, setThemeNameState] = useState<ThemeName>(saved.themeName ?? initialTheme);
   const [lang, setLangState] = useState<Lang>(saved.lang ?? initialLang);
+  const [userName, setUserName] = useState<string>(saved.userName ?? '');
 
   const theme = getTheme(themeName);
   const t = (key: string, vars?: Record<string, string | number>) => tstr(lang, key, vars);
@@ -63,35 +54,69 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const stored = persistKey ? dosiStore.read(persistKey) : null;
   const todayStr = dosiStore.todayStr();
 
-  const startMeds = stored?.meds ?? INITIAL_MEDS;
+  const startMeds = stored?.meds ?? [];
   const startDoses = (stored?.doses && stored.date === todayStr)
     ? stored.doses
-    : buildTodayDoses(startMeds, new Date().getHours(), { autoMarkTaken: !persistKey });
+    : buildTodayDoses(startMeds, new Date());
 
   const userId = useRef<string | null>(null);
 
-  const [screen, setScreen] = useState<ScreenId>('onboarding');
+  const [screen, setScreen] = useState<ScreenId>(saved.onboarded ? 'main' : 'onboarding');
   const [tab, setTab] = useState<TabId>('home');
   const [meds, setMeds] = useState<Medicine[]>(startMeds);
   const [doses, setDoses] = useState<Dose[]>(startDoses);
   const [historyDoses, setHistoryDoses] = useState<Dose[]>([]);
   const [selMedId, setSelMedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Medicine | null>(null);
+  const [resumeMode, setResumeMode] = useState(false);
   const [notif, setNotif] = useState<{ med: Medicine; dose: Dose } | null>(null);
   const [confirm, setConfirm] = useState<{ med: Medicine; time: string } | null>(null);
   const [stockAlertMed, setStockAlertMed] = useState<Medicine | null>(null);
   const stockAlertShown = useRef(new Set<string>());
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [manageCg, setManageCg] = useState<Caregiver | null>(null);
+  const [account, setAccount] = useState<{ userId: string | null; email: string | null; isAnonymous: boolean }>(
+    { userId: null, email: null, isAnonymous: true }
+  );
+  const [authSheet, setAuthSheet] = useState<'link' | 'signin' | null>(null);
   const [confirmPause, setConfirmPause] = useState<Medicine | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Medicine | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
+  const [pendingSync, setPendingSync] = useState(0);
+
+  const persistMed = (med: Medicine) => {
+    const uid = userId.current;
+    if (uid) {
+      pushMed(med, uid).catch(() => { enqueue({ t: 'med', med }); setPendingSync(outboxSize()); });
+    } else {
+      enqueue({ t: 'med', med }); setPendingSync(outboxSize());
+    }
+  };
+  const persistDose = (dose: Dose) => {
+    const uid = userId.current;
+    if (uid) {
+      pushDose(dose, uid).catch(() => { enqueue({ t: 'dose', dose }); setPendingSync(outboxSize()); });
+    } else {
+      enqueue({ t: 'dose', dose }); setPendingSync(outboxSize());
+    }
+  };
+  const persistDelMed = (id: string) => {
+    const uid = userId.current;
+    if (uid) {
+      deleteMed(id).catch(() => { enqueue({ t: 'delMed', id }); setPendingSync(outboxSize()); });
+    } else {
+      enqueue({ t: 'delMed', id }); setPendingSync(outboxSize());
+    }
+  };
+
+  const flushSync = () => {
+    const uid = userId.current;
+    if (uid) flushOutbox(uid).then(setPendingSync);
+  };
 
   // Persist settings changes
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ themeName, lang }));
-  }, [themeName, lang]);
+    writeSettings({ themeName, lang, userName });
+  }, [themeName, lang, userName]);
 
   useEffect(() => {
     if (!persistKey) return;
@@ -104,6 +129,8 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       const uid = await ensureSession();
       if (!uid) return;
       userId.current = uid;
+      setAccount(await getAccount());
+      setPendingSync(await flushOutbox(uid));
 
       const [remote, history] = await Promise.all([
         pullAll(uid),
@@ -117,33 +144,59 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         if (remote.doses.length > 0) {
           setDoses(remote.doses);
         } else {
-          const fresh = buildTodayDoses(remote.meds, new Date().getHours());
+          const fresh = buildTodayDoses(remote.meds, new Date());
           setDoses(fresh);
           pushDoses(fresh, uid);
         }
-      } else {
-        await pushMeds(startMeds, uid);
-        await pushDoses(startDoses, uid);
       }
+      // sin else: remoto vacío → el usuario empieza vacío; el primer pushMed
+      // ocurre cuando crea su primera medicina
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const prevMedsCount = useRef(meds.length);
+  // Flush the offline write outbox whenever connectivity returns
   useEffect(() => {
-    if (meds.length === prevMedsCount.current) return;
-    prevMedsCount.current = meds.length;
+    const onOnline = () => {
+      const uid = userId.current;
+      if (uid) flushOutbox(uid).then(setPendingSync);
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
+
+  // Rebuild today's doses whenever any schedule-relevant field changes
+  // (pause/resume, freq, weekdays, times, duration) — not just the med count.
+  const schedSig = meds
+    .map(m => `${m.id}|${m.paused ? 1 : 0}|${m.schedule.freq}|${(m.schedule.weekdays ?? []).join(',')}|${expandTimes(m).join(',')}|${m.duration.kind}:${m.duration.days ?? ''}:${m.duration.until ?? ''}:${m.duration.startedOn}`)
+    .join(';');
+  const prevSchedSig = useRef(schedSig);
+  useEffect(() => {
+    if (schedSig === prevSchedSig.current) return;
+    prevSchedSig.current = schedSig;
     setDoses(prev => {
-      const fresh = buildTodayDoses(meds, new Date().getHours(), { autoMarkTaken: !persistKey });
+      const fresh = buildTodayDoses(meds, new Date());
       return fresh.map(fd => {
         const existing = prev.find(p => p.medId === fd.medId && p.time === fd.time);
         return existing ? { ...fd, status: existing.status } : fd;
       });
     });
-  }, [meds, persistKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedSig, meds]);
 
   const setThemeName = (name: ThemeName) => setThemeNameState(name);
   const setLang = (l: Lang) => setLangState(l);
+
+  const handleSignOut = async () => {
+    if (persistKey) dosiStore.clear(persistKey);
+    const uid = await signOutToAnon();
+    userId.current = uid;
+    clearOutbox(); setPendingSync(0);
+    setMeds([]); setDoses([]); setHistoryDoses([]);
+    setAccount(await getAccount());
+    setTab('home'); setScreen('main');
+    setToast({ message: t('signedOutToast'), kind: 'neutral' });
+  };
 
   const showNotif = () => {
     const upcoming = doses.find(d => d.status === 'upcoming' || d.status === 'now');
@@ -165,10 +218,8 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
     setHistoryDoses(hs => hs.map(h => h.id === doseId ? { ...h, status: 'taken' as const } : h));
     setConfirm({ med, time: d.time });
     setNotif(null);
-    if (userId.current) {
-      pushDose(updatedDose, userId.current);
-      pushMed(updatedMed, userId.current);
-    }
+    persistDose(updatedDose);
+    persistMed(updatedMed);
     setTimeout(() => {
       const newStock = updatedMed.stock;
       if (newStock > 0 && newStock <= 6 && !stockAlertShown.current.has(med.id)) {
@@ -180,22 +231,20 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
 
   const snoozeDose = (doseId: string) => {
     setNotif(null);
-    setDoses(ds => ds.map(x => {
-      if (x.id !== doseId) return x;
-      const updated = { ...x, time: shiftTime(x.time, 10) };
-      if (userId.current) pushDose(updated, userId.current);
-      return updated;
-    }));
+    const target = doses.find(x => x.id === doseId);
+    if (!target) return;
+    const updated = { ...target, time: shiftTime(target.time, 10) };
+    setDoses(ds => ds.map(x => x.id === doseId ? updated : x));
+    persistDose(updated);
   };
 
   const skipDose = (doseId: string) => {
     setNotif(null);
-    setDoses(ds => ds.map(x => {
-      if (x.id !== doseId) return x;
-      const updated = { ...x, status: 'skipped' as const };
-      if (userId.current) pushDose(updated, userId.current);
-      return updated;
-    }));
+    const target = doses.find(x => x.id === doseId);
+    if (!target) return;
+    const updated: Dose = { ...target, status: 'skipped' };
+    setDoses(ds => ds.map(x => x.id === doseId ? updated : x));
+    persistDose(updated);
   };
 
   const openMed = (medId: string) => { setSelMedId(medId); setScreen('detail'); };
@@ -207,7 +256,11 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   let body: React.ReactNode = null;
 
   if (screen === 'onboarding') {
-    body = <OnboardingScreen theme={theme} t={t} lang={lang} onDone={() => setScreen('main')} />;
+    body = <OnboardingScreen theme={theme} t={t} lang={lang} onDone={(name) => {
+      if (name) setUserName(name);
+      writeSettings({ onboarded: true });
+      setScreen('main');
+    }} />;
   } else if (screen === 'addMed') {
     const isEdit = !!editing;
     body = (
@@ -215,34 +268,52 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         theme={theme} t={t} lang={lang}
         mode={isEdit ? 'edit' : 'add'}
         initialData={editing}
-        onCancel={() => { setScreen(isEdit ? 'detail' : 'main'); setEditing(null); }}
+        onCancel={() => { setScreen(isEdit ? 'detail' : 'main'); setEditing(null); setResumeMode(false); }}
         onSave={d => {
+          const cleanTimes = [...new Set(d.times)].sort();
+          const buildSchedule = (): Medicine['schedule'] =>
+            d.freq === 'interval'
+              ? { freq: 'interval', times: [d.times[0] ?? '08:00'], intervalHours: d.intervalHours }
+              : d.freq === 'weekdays'
+              ? { freq: 'weekdays', times: cleanTimes, weekdays: d.weekdays }
+              : { freq: 'daily', times: cleanTimes };
+          const buildDuration = (startedOn: string): Medicine['duration'] =>
+            d.duration === 'days'
+              ? { kind: 'days', days: d.days, startedOn }
+              : d.duration === 'until'
+              ? { kind: 'until', until: d.until, startedOn }
+              : { kind: 'ongoing', startedOn };
+
           if (isEdit && editing) {
             const updated: Medicine = {
               ...editing,
               name: d.name || editing.name,
               dose: d.dose, form: d.form, color: d.color,
-              schedule: { ...editing.schedule, freq: d.freq, times: d.times },
-              stock: d.stock, expiry: d.expiry, notes: d.notes,
+              schedule: buildSchedule(),
+              duration: buildDuration(resumeMode ? todayStr : editing.duration.startedOn),
+              stock: d.stock,
+              expiry: d.expiry || undefined,
+              notes: d.notes || undefined,
+              paused: resumeMode ? false : editing.paused,
             };
             setMeds(ms => ms.map(m => m.id === editing.id ? updated : m));
-            if (userId.current) pushMed(updated, userId.current);
+            persistMed(updated);
             setToast({ message: t('toastSaved'), kind: 'success', icon: I.check(16, '#fff') });
-            setScreen('detail'); setEditing(null);
+            setScreen('detail'); setEditing(null); setResumeMode(false);
           } else {
             const newMed: Medicine = {
               id: crypto.randomUUID(),
-              name: d.name || 'Nueva medicina',
+              name: d.name || t('addMed'),
               dose: d.dose, form: d.form, color: d.color,
-              schedule: { freq: d.freq, times: d.times },
-              duration: d.duration === 'forDays'
-                ? { kind: 'days', days: d.days, startedDay: 1 }
-                : { kind: 'ongoing' },
-              stock: d.stock, expiry: d.expiry, notes: d.notes,
+              schedule: buildSchedule(),
+              duration: buildDuration(todayStr),
+              stock: d.stock,
+              expiry: d.expiry || undefined,
+              notes: d.notes || undefined,
             };
             setMeds(ms => [...ms, newMed]);
-            if (userId.current) pushMed(newMed, userId.current);
-            setScreen('main'); setTab('inventory');
+            persistMed(newMed);
+            setScreen('main'); setTab('inventory'); setResumeMode(false);
           }
         }}
       />
@@ -253,15 +324,17 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       <DetailScreen
         theme={theme} t={t} lang={lang}
         med={med ?? null}
+        historyDoses={historyDoses.filter(h => h.medId === selMedId)}
         onBack={() => setScreen('main')}
         onShowStockAlert={() => med && setStockAlertMed(med)}
-        onEdit={() => { if (med) { setEditing(med); setScreen('addMed'); } }}
+        onEdit={() => { if (med) { setEditing(med); setResumeMode(false); setScreen('addMed'); } }}
+        onResumeExtend={() => { if (med) { setEditing(med); setResumeMode(true); setScreen('addMed'); } }}
         onPauseToggle={() => {
           if (!med) return;
           if (med.paused) {
             const updated = { ...med, paused: false };
             setMeds(ms => ms.map(m => m.id === med.id ? updated : m));
-            if (userId.current) pushMed(updated, userId.current);
+            persistMed(updated);
             setToast({ message: t('toastResumed', { name: med.name }), kind: 'success', icon: I.check(16, '#fff') });
           } else {
             setConfirmPause(med);
@@ -275,6 +348,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       body = (
         <HomeScreen
           theme={theme} t={t} lang={lang}
+          userName={userName}
           meds={meds} doses={doses}
           onMark={markTaken} onSnooze={snoozeDose} onSkip={skipDose}
           onAddMed={() => setScreen('addMed')}
@@ -306,22 +380,17 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         <ProfileScreen
           theme={theme} t={t} lang={lang}
           themeName={themeName}
-          caregivers={PATIENT_CAREGIVERS}
+          userName={userName}
+          account={account}
+          onUserNameChange={setUserName}
           onThemeChange={setThemeName}
           onLangChange={setLang}
-          onInviteCaregiver={() => setInviteOpen(true)}
-          onManageCaregiver={cg => setManageCg(cg)}
+          onLinkAccount={() => setAuthSheet('link')}
+          onSignIn={() => setAuthSheet('signin')}
+          onSignOut={handleSignOut}
           onResetData={() => setConfirmReset(true)}
-          onLoadDemo={() => {
-            const freshDoses = buildTodayDoses(INITIAL_MEDS, new Date().getHours(), { autoMarkTaken: true });
-            setMeds(INITIAL_MEDS);
-            setDoses(freshDoses);
-            if (userId.current) {
-              pushMeds(INITIAL_MEDS, userId.current);
-              pushDoses(freshDoses, userId.current);
-            }
-            setToast({ message: t('loadDemo'), kind: 'success', icon: I.check(16, '#fff') });
-          }}
+          pendingSync={pendingSync}
+          onFlushSync={flushSync}
         />
       );
     }
@@ -340,7 +409,24 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         pointerEvents: 'none',
       }} />
 
-      <div style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', paddingTop: 48 }}>
+      {pendingSync > 0 && (
+        <button
+          onClick={flushSync}
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 6,
+            background: theme.warnSoft, color: theme.warn, border: 0,
+            fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
+            padding: '6px 12px', cursor: 'pointer', textAlign: 'center',
+          }}
+        >
+          {t('syncPending', { n: pendingSync })}
+        </button>
+      )}
+
+      <div style={{
+        height: '100%', overflowY: 'auto', overflowX: 'hidden',
+        paddingTop: pendingSync > 0 ? 84 : 48,
+      }}>
         {body}
       </div>
 
@@ -389,19 +475,47 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onRefill={() => {
             const updated = { ...stockAlertMed, stock: stockAlertMed.stock + 30 };
             setMeds(ms => ms.map(m => m.id === stockAlertMed.id ? updated : m));
-            if (userId.current) pushMed(updated, userId.current);
+            persistMed(updated);
             setStockAlertMed(null);
           }}
           onRemind={() => setStockAlertMed(null)}
         />
       )}
 
-      {inviteOpen && (
-        <InviteCaregiverSheet theme={theme} t={t} lang={lang} onClose={() => setInviteOpen(false)} />
-      )}
-
-      {manageCg && (
-        <ManageCaregiverSheet theme={theme} t={t} lang={lang} caregiver={manageCg} onClose={() => setManageCg(null)} />
+      {authSheet && (
+        <AuthSheet
+          theme={theme} t={t}
+          mode={authSheet}
+          onClose={() => setAuthSheet(null)}
+          onSuccess={async ({ userId: newUid }) => {
+            setAuthSheet(null);
+            if (newUid && newUid !== userId.current) {
+              userId.current = newUid;
+              flushOutbox(newUid).then(setPendingSync);
+              const [remote, history] = await Promise.all([pullAll(newUid), pullHistory(newUid, 7)]);
+              const rMeds = remote?.meds ?? [];
+              const rDoses = (remote?.doses && remote.doses.length > 0)
+                ? remote.doses
+                : buildTodayDoses(rMeds, new Date());
+              setMeds(rMeds);
+              setDoses(rDoses);
+              setHistoryDoses(history);
+              if ((!remote?.doses || remote.doses.length === 0) && rMeds.length > 0) {
+                pushDoses(rDoses, newUid);
+              }
+              setAccount(await getAccount());
+              setToast({ message: t('authSignedInToast'), kind: 'success', icon: I.check(16, '#fff') });
+            } else {
+              const acc = await getAccount();
+              setAccount(acc);
+              if (acc.email && !acc.isAnonymous) {
+                setToast({ message: t('authLinkedToast'), kind: 'success', icon: I.check(16, '#fff') });
+              } else {
+                setToast({ message: t('authLinkPending'), kind: 'neutral' });
+              }
+            }
+          }}
+        />
       )}
 
       {confirmPause && (
@@ -416,7 +530,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onConfirm={() => {
             const updated = { ...confirmPause, paused: true };
             setMeds(ms => ms.map(m => m.id === confirmPause.id ? updated : m));
-            if (userId.current) pushMed(updated, userId.current);
+            persistMed(updated);
             setConfirmPause(null);
             setToast({ message: t('toastPaused', { name: confirmPause.name }), kind: 'success', icon: I.pause(16, '#fff') });
           }}
@@ -437,7 +551,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
             const name = confirmDelete.name;
             setMeds(ms => ms.filter(m => m.id !== id));
             setDoses(ds => ds.filter(d => d.medId !== id));
-            if (userId.current) deleteMed(id);
+            persistDelMed(id);
             setConfirmDelete(null);
             setScreen('main');
             setToast({ message: t('toastDeleted', { name }), kind: 'danger', icon: I.trash(16, '#fff') });
@@ -456,8 +570,9 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onCancel={() => setConfirmReset(false)}
           onConfirm={async () => {
             if (persistKey) dosiStore.clear(persistKey);
+            clearOutbox(); setPendingSync(0);
             if (userId.current) {
-              for (const m of meds) await deleteMed(m.id);
+              try { for (const m of meds) await deleteMed(m.id); } catch { /* wipe proceeds locally */ }
             }
             setMeds([]); setDoses([]); setHistoryDoses([]);
             setConfirmReset(false);
