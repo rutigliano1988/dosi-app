@@ -212,6 +212,10 @@ const es: StringsMap = {
   cgStopTitle: '¿Dejar de cuidar a {name}?',
   cgStopMsg: 'Dejarás de recibir avisos si se salta una toma.',
   cgStop: 'Dejar de cuidar',
+  cgAcceptedToast: 'Ahora cuidas a {name}',
+  cgRemovedToast: 'Cuidador quitado',
+  cgMarkedToast: 'Toma marcada',
+  cgNudgeToast: 'Recordatorio enviado',
 };
 
 const en: StringsMap = {
@@ -418,6 +422,10 @@ const en: StringsMap = {
   cgStopTitle: 'Stop looking after {name}?',
   cgStopMsg: "You'll stop getting alerts if they miss a dose.",
   cgStop: 'Stop caring',
+  cgAcceptedToast: 'You now look after {name}',
+  cgRemovedToast: 'Caregiver removed',
+  cgMarkedToast: 'Dose marked',
+  cgNudgeToast: 'Reminder sent',
 };
 
 const STRINGS: Record<Lang, StringsMap> = { es, en };

@@ -4,7 +4,7 @@ import { tstr, type Lang } from './i18n/strings';
 import { buildTodayDoses, shiftTime, expandTimes } from './lib/schedule';
 import { readSettings, writeSettings } from './data/settings';
 import { dosiStore } from './data/store';
-import { ensureSession, getAccount, signOutToAnon } from './lib/supabase';
+import { ensureSession, getAccount, signOutToAnon, supabase } from './lib/supabase';
 import { pullAll, pullHistory, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
 import { enqueue, outboxSize, clearOutbox, flushOutbox } from './data/outbox';
 import type { Medicine, Dose } from './data/types';
@@ -26,9 +26,13 @@ import ConfirmTakenOverlay from './screens/ConfirmTakenOverlay';
 import StockAlertSheet from './screens/StockAlertSheet';
 import AuthSheet from './screens/AuthSheet';
 import PushSheet from './screens/PushSheet';
+import CaregiverSheet from './screens/CaregiverSheet';
+import CaregiverScreen from './screens/CaregiverScreen';
+import { myCaregiverRow, createPairCode, regeneratePairCode, cancelCaregiver, acceptCode, listPatients } from './lib/caregiver';
+import type { CaregiverRow } from './data/types';
 import { pushSupported, pushPermission, needsInstallFirst, enablePush, disablePush, syncPush, pushHasSubscription } from './lib/push';
 
-export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail';
+export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail' | 'caregiver';
 export type TabId = 'home' | 'inventory' | 'calendar' | 'profile';
 
 interface AppProps {
@@ -85,6 +89,16 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   // force pushState/showPushBanner recompute after permission change
   const [pushTick, setPushTick] = useState(0);
   const [pushSubscribed, setPushSubscribed] = useState<boolean | null>(null);
+
+  const [caregiver, setCaregiver] = useState<CaregiverRow | null>(null);
+  const [caredForCount, setCaredForCount] = useState(0);
+  const [cgSheet, setCgSheet] = useState<'show' | 'enter' | null>(null);
+  const [confirmRemoveCg, setConfirmRemoveCg] = useState(false);
+
+  const refreshCaregiver = () => {
+    myCaregiverRow().then(setCaregiver);
+    listPatients().then((p) => setCaredForCount(p.length));
+  };
 
   void pushTick; // dependency so pushState/showPushBanner recompute after each permission change
   const perm = pushPermission();
@@ -150,6 +164,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
       if (!uid) return;
       userId.current = uid;
       setAccount(await getAccount());
+      refreshCaregiver();
       if (pushPermission() === 'granted') { syncPush(uid).catch(() => {}).then(refreshPushSubscribed); }
       setPendingSync(await flushOutbox(uid));
 
@@ -243,10 +258,38 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
     writeSettings({ pushAsked: true });
   };
 
+  const handleAddCaregiver = async () => {
+    if (!caregiver || (!caregiver.caregiverUserId && !caregiver.pairCode)) {
+      await createPairCode(userName);
+      refreshCaregiver();
+    }
+    setCgSheet('show');
+  };
+  const handleRegenCode = async () => { await regeneratePairCode(); refreshCaregiver(); };
+  const handleCancelCode = async () => { await cancelCaregiver(); refreshCaregiver(); setCgSheet(null); };
+  const handleBecomeCaregiver = () => {
+    if (!pushSupported() || pushPermission() !== 'granted') { setPushSheet(true); return; }
+    setCgSheet('enter');
+  };
+  const submitCaregiverCode = async (code: string): Promise<'ok' | 'bad-code' | 'self' | 'no-push' | 'network'> => {
+    const r = await acceptCode(code, userName);
+    if ('error' in r) return r.error;
+    refreshCaregiver();
+    setToast({ message: t('cgAcceptedToast', { name: r.ownerName || '—' }), kind: 'success', icon: I.check(16, '#fff') });
+    return 'ok';
+  };
+
   const handleSignOut = async () => {
     if (persistKey) dosiStore.clear(persistKey);
     await disablePush().catch(() => {});
     setPushSubscribed(false);
+    const prevUid = userId.current;
+    if (prevUid) {
+      await supabase.from('caregivers').delete()
+        .or(`owner_user_id.eq.${prevUid},caregiver_user_id.eq.${prevUid}`)
+        .then(() => {}, () => {});
+    }
+    setCaregiver(null); setCaredForCount(0);
     const uid = await signOutToAnon();
     userId.current = uid;
     clearOutbox(); setPendingSync(0);
@@ -405,6 +448,14 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         onDelete={() => med && setConfirmDelete(med)}
       />
     );
+  } else if (screen === 'caregiver') {
+    body = (
+      <CaregiverScreen
+        theme={theme} t={t} lang={lang}
+        onBack={() => { setScreen('main'); setTab('profile'); }}
+        onEnablePush={() => { doEnablePush(); }}
+      />
+    );
   } else {
     if (tab === 'home') {
       body = (
@@ -457,14 +508,13 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           pushState={pushState}
           onEnablePush={() => { doEnablePush(); }}
           onDisablePush={() => { doDisablePush(); }}
-          // TODO Task 12: cablear caregiver
-          caregiver={null}
-          caredForCount={0}
-          onAddCaregiver={() => {}}
-          onManageCaregiver={() => {}}
-          onRemoveCaregiver={() => {}}
-          onBecomeCaregiver={() => {}}
-          onOpenCaredFor={() => {}}
+          caregiver={caregiver}
+          caredForCount={caredForCount}
+          onAddCaregiver={handleAddCaregiver}
+          onManageCaregiver={() => setCgSheet('show')}
+          onRemoveCaregiver={() => setConfirmRemoveCg(true)}
+          onBecomeCaregiver={handleBecomeCaregiver}
+          onOpenCaredFor={() => setScreen('caregiver')}
           pendingSync={pendingSync}
           onFlushSync={flushSync}
         />
@@ -588,6 +638,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
                 pushDoses(rDoses, newUid);
               }
               setAccount(await getAccount());
+              refreshCaregiver();
               setToast({ message: t('authSignedInToast'), kind: 'success', icon: I.check(16, '#fff') });
             } else {
               const acc = await getAccount();
@@ -607,6 +658,44 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           theme={theme} t={t}
           onClose={() => setPushSheet(false)}
           onEnable={doEnablePush}
+        />
+      )}
+
+      {cgSheet === 'show' && (
+        <CaregiverSheet
+          theme={theme} t={t} mode="show"
+          code={caregiver?.pairCode ?? undefined}
+          expiresAt={caregiver?.pairCodeExpiresAt ?? null}
+          onClose={() => setCgSheet(null)}
+          onRegenerate={handleRegenCode}
+          onCancelCode={handleCancelCode}
+        />
+      )}
+      {cgSheet === 'enter' && (
+        <CaregiverSheet
+          theme={theme} t={t} mode="enter"
+          onClose={() => setCgSheet(null)}
+          onSubmitCode={submitCaregiverCode}
+        />
+      )}
+      {confirmRemoveCg && (
+        <ConfirmDialog
+          theme={theme}
+          title={t('cgRemoveTitle')}
+          message={t('cgRemoveMsg')}
+          confirmLabel={t('cgRemoveConfirm')}
+          confirmIcon={I.trash(16, '#fff')}
+          confirmKind="danger"
+          onCancel={() => setConfirmRemoveCg(false)}
+          onConfirm={async () => {
+            await cancelCaregiver();
+            if (caregiver?.caregiverUserId) {
+              await supabase.from('caregivers').delete().eq('id', caregiver.id).then(() => {}, () => {});
+            }
+            setConfirmRemoveCg(false);
+            refreshCaregiver();
+            setToast({ message: t('cgRemovedToast'), kind: 'neutral' });
+          }}
         />
       )}
 
