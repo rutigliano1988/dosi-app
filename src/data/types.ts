@@ -42,3 +42,13 @@ export interface Dose {
   status: DoseStatus;
   date?: string;                 // ISO — presente en dosis históricas de Supabase
 }
+
+export interface CaregiverRow {
+  id: string;
+  ownerUserId: string;
+  caregiverUserId: string | null;
+  name: string | null;          // nombre del cuidador (null hasta aceptar)
+  ownerName: string | null;     // nombre del paciente
+  pairCode: string | null;
+  pairCodeExpiresAt: string | null;
+}
