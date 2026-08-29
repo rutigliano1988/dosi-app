@@ -216,6 +216,7 @@ const es: StringsMap = {
   cgRemovedToast: 'Cuidador quitado',
   cgMarkedToast: 'Toma marcada',
   cgNudgeToast: 'Recordatorio enviado',
+  cgPatientPushOff: '{name} tiene las notificaciones desactivadas. No podrás recibir avisos de tomas olvidadas.',
 };
 
 const en: StringsMap = {
@@ -426,6 +427,7 @@ const en: StringsMap = {
   cgRemovedToast: 'Caregiver removed',
   cgMarkedToast: 'Dose marked',
   cgNudgeToast: 'Reminder sent',
+  cgPatientPushOff: "{name} has notifications turned off. You won't get missed-dose alerts.",
 };
 
 const STRINGS: Record<Lang, StringsMap> = { es, en };

@@ -21,7 +21,10 @@ interface CaregiverScreenProps {
 }
 
 type Patient = { relationId: string; patientId: string; ownerName: string | null };
-type Today = { ownerName: string | null; patientNowMin: number; meds: Medicine[]; doses: PatientDose[] };
+type Today = {
+  ownerName: string | null; patientNowMin: number; patientPushOff: boolean;
+  meds: Medicine[]; doses: PatientDose[];
+};
 
 function deriveStatus(d: PatientDose, nowMin: number): 'taken' | 'skipped' | 'missed' | 'pending' {
   if (d.status === 'taken') return 'taken';
@@ -62,6 +65,7 @@ export default function CaregiverScreen({ theme, t, lang, onBack, onEnablePush }
     setToday({
       ownerName: r.ownerName,
       patientNowMin: r.patientNowMin,
+      patientPushOff: r.patientPushOff,
       meds: r.medicines.map((m) => rowToMed(m)),
       doses: [...r.doses].sort((a, b) => a.totalMin - b.totalMin),
     });
@@ -75,7 +79,10 @@ export default function CaregiverScreen({ theme, t, lang, onBack, onEnablePush }
   if (!sel) {
     return (
       <div style={{ paddingTop: 8, paddingBottom: 120 }}>
-        <TopBar theme={theme} title={t('cgPatientsTitle')} left={<BackBtn theme={theme} onBack={onBack} />} />
+        <div style={{ padding: '8px 16px 0' }}>
+          <BackBtn theme={theme} onBack={onBack} />
+        </div>
+        <TopBar theme={theme} title={t('cgPatientsTitle')} />
         {err === 'gone' && <Banner theme={theme} text={t('cgGone')} />}
         <div style={{ padding: '0 16px' }}>
           {(patients ?? []).map((p) => (
@@ -97,10 +104,12 @@ export default function CaregiverScreen({ theme, t, lang, onBack, onEnablePush }
   // ── "Hoy de X" ──
   return (
     <div style={{ paddingTop: 8, paddingBottom: 120 }}>
+      <div style={{ padding: '8px 16px 0' }}>
+        <BackBtn theme={theme} onBack={() => { setSel(null); setToday(null); }} />
+      </div>
       <TopBar
         theme={theme}
         title={t('cgTodayTitle', { name })}
-        left={<BackBtn theme={theme} onBack={() => { setSel(null); setToday(null); }} />}
         right={
           <button onClick={() => sel && load(sel)} aria-label={t('cgRefresh')} style={{
             width: 36, height: 36, borderRadius: 12, background: theme.surface2, border: 0,
@@ -120,6 +129,8 @@ export default function CaregiverScreen({ theme, t, lang, onBack, onEnablePush }
         </div>
       )}
       {err === 'network' && <Banner theme={theme} text={t('cgErrNetwork')} />}
+
+      {today?.patientPushOff && <Banner theme={theme} text={t('cgPatientPushOff', { name })} />}
 
       {loading && !today && (
         <div style={{ color: theme.textDim, textAlign: 'center', padding: 32 }}>…</div>
@@ -166,6 +177,7 @@ export default function CaregiverScreen({ theme, t, lang, onBack, onEnablePush }
                       if (!sel) return;
                       const r = await nudgePatient(sel.patientId, d.id);
                       if (r === 'skipped') { load(sel); return; }
+                      if (r === 'error') { setErr('network'); return; }
                       setSentFor((s) => new Set(s).add(d.id));
                       setTimeout(() => setSentFor((s) => { const n = new Set(s); n.delete(d.id); return n; }), 60_000);
                     }}
@@ -208,9 +220,10 @@ export default function CaregiverScreen({ theme, t, lang, onBack, onEnablePush }
 function BackBtn({ theme, onBack }: { theme: Theme; onBack: () => void }) {
   return (
     <button onClick={onBack} style={{
-      width: 36, height: 36, borderRadius: 12, background: theme.surface2, border: 0,
-      color: theme.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>{I.back(18, theme.text)}</button>
+      width: 42, height: 42, borderRadius: 14, background: theme.surface,
+      border: `1px solid ${theme.border}`, color: theme.text, cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>{I.back(20, theme.text)}</button>
   );
 }
 function Banner({ theme, text }: { theme: Theme; text: string }) {

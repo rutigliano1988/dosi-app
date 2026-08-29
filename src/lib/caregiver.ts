@@ -51,15 +51,17 @@ async function upsertCode(ownerName: string): Promise<string> {
   if (existing.data) {
     const patch: Record<string, unknown> = { pair_code: code, pair_code_expires_at: expires };
     if (ownerName) patch.owner_name = ownerName;
-    await supabase.from('caregivers').update(patch).eq('id', existing.data.id);
+    const { error } = await supabase.from('caregivers').update(patch).eq('id', existing.data.id);
+    if (error) throw new Error(error.message);
   } else {
-    await supabase.from('caregivers').insert({
+    const { error } = await supabase.from('caregivers').insert({
       id: crypto.randomUUID(),
       owner_user_id: user.id,
       owner_name: ownerName || null,
       pair_code: code,
       pair_code_expires_at: expires,
     });
+    if (error) throw new Error(error.message);
   }
   return code;
 }
@@ -98,7 +100,10 @@ async function call<T>(body: Record<string, unknown>): Promise<T | { error: stri
         const ctx = (error as { context?: Response }).context;
         if (ctx && typeof ctx.json === 'function') {
           const j = await ctx.json();
-          if (j && typeof j.error === 'string') return { error: j.error };
+          if (j && typeof j.error === 'string') {
+            // El 401 de la Edge fn ('unauthorized') = falta la fila push_subscriptions del llamante.
+            return { error: j.error === 'unauthorized' ? 'no-push' : j.error };
+          }
         }
       } catch { /* fall through to 'network' */ }
       return { error: 'network' };
@@ -129,10 +134,12 @@ export async function listPatients(): Promise<{ relationId: string; patientId: s
 
 export async function patientToday(patientId: string): Promise<{
   ownerName: string | null; today: string; patientNowMin: number;
+  patientPushOff: boolean;
   medicines: Record<string, unknown>[]; doses: PatientDose[];
 } | { error: 'not-your-patient' | 'no-push' | 'network' }> {
   const r = await call<{
     ok: boolean; ownerName: string | null; today: string; patientNowMin: number;
+    patientPushOff?: boolean;
     medicines: Record<string, unknown>[]; doses: Record<string, unknown>[]; error?: string;
   }>({ action: 'patient-today', patientId });
   if ('error' in r) {
@@ -142,6 +149,7 @@ export async function patientToday(patientId: string): Promise<{
     ownerName: r.ownerName ?? null,
     today: r.today,
     patientNowMin: r.patientNowMin,
+    patientPushOff: r.patientPushOff ?? false,
     medicines: r.medicines,
     doses: r.doses.map((d) => ({
       id: String(d.id), medId: String(d.med_id), time: String(d.time),
@@ -156,11 +164,14 @@ export async function markDoseForPatient(patientId: string, doseId: string): Pro
   await call({ action: 'mark', patientId, doseId });
 }
 
-export async function nudgePatient(patientId: string, doseId: string): Promise<'sent' | 'cooldown' | 'skipped'> {
-  const r = await call<{ ok: boolean; cooldown?: boolean; skipped?: boolean }>({
+export async function nudgePatient(
+  patientId: string, doseId: string,
+): Promise<'sent' | 'cooldown' | 'skipped' | 'error'> {
+  const r = await call<{ ok: boolean; cooldown?: boolean; skipped?: boolean; undelivered?: boolean }>({
     action: 'nudge', patientId, doseId,
   });
-  if ('error' in r) return 'sent'; // el error de red se traga; el cuidador puede reintentar
+  if ('error' in r) return 'error';
+  if (r.ok === false) return 'error'; // undelivered: todos los webpush fallaron, sin cooldown → reintentable
   if (r.cooldown) return 'cooldown';
   if (r.skipped) return 'skipped';
   return 'sent';

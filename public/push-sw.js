@@ -25,11 +25,15 @@ self.addEventListener('push', (event) => {
   );
 });
 
+// Solo se permite POSTear el secret a las Edge Functions de este proyecto Supabase.
+const OK_ACTION = 'https://uwcktxqrfuelmscmkhbs.supabase.co/functions/v1/';
+
 self.addEventListener('notificationclick', (event) => {
   const d = event.notification.data || {};
   event.notification.close();
 
   if (event.action === 'take' || event.action === 'snooze') {
+    if (typeof d.actionUrl !== 'string' || !d.actionUrl.startsWith(OK_ACTION)) { return; }
     event.waitUntil(
       fetch(d.actionUrl, {
         method: 'POST',
@@ -45,6 +49,7 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   if (event.action === 'cg-mark' || event.action === 'cg-nudge') {
+    if (typeof d.actionUrl !== 'string' || !d.actionUrl.startsWith(OK_ACTION)) { return; }
     event.waitUntil(
       fetch(d.actionUrl, {
         method: 'POST',

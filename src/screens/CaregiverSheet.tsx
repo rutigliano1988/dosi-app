@@ -32,9 +32,9 @@ export default function CaregiverSheet({
   };
 
   const hoursLeft = expiresAt
-    ? Math.max(0, Math.round((Date.parse(expiresAt) - Date.now()) / 3_600_000))
+    ? Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 3_600_000))
     : 0;
-  const expired = Boolean(expiresAt) && hoursLeft <= 0;
+  const expired = expiresAt != null && Date.parse(expiresAt) <= Date.now();
 
   const share = async () => {
     if (!code) return;

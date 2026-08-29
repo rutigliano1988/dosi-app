@@ -252,7 +252,7 @@ export default function ProfileScreen({
             const pending = cg && !cg.caregiverUserId && cg.pairCode;
             const expired = pending && cg.pairCodeExpiresAt != null && Date.parse(cg.pairCodeExpiresAt) <= Date.now();
             const hours = pending && cg.pairCodeExpiresAt
-              ? Math.max(0, Math.round((Date.parse(cg.pairCodeExpiresAt) - Date.now()) / 3_600_000))
+              ? Math.max(0, Math.ceil((Date.parse(cg.pairCodeExpiresAt) - Date.now()) / 3_600_000))
               : 0;
             if (!cg) return <Row theme={theme} icon={I.heart} label={t('cgAddRow')} onPress={onAddCaregiver} first />;
             if (cg.caregiverUserId) return <Row theme={theme} icon={I.heart} label={t('cgActiveRow', { name: cg.name || '—' })} onPress={onRemoveCaregiver} first />;

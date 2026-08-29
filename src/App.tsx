@@ -95,10 +95,11 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   const [cgSheet, setCgSheet] = useState<'show' | 'enter' | null>(null);
   const [confirmRemoveCg, setConfirmRemoveCg] = useState(false);
 
-  const refreshCaregiver = () => {
-    myCaregiverRow().then(setCaregiver);
-    listPatients().then((p) => setCaredForCount(p.length));
-  };
+  const refreshCaregiver = () =>
+    Promise.all([
+      myCaregiverRow().then(setCaregiver),
+      listPatients().then((p) => setCaredForCount(p.length)),
+    ]);
 
   void pushTick; // dependency so pushState/showPushBanner recompute after each permission change
   const perm = pushPermission();
@@ -259,14 +260,18 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   };
 
   const handleAddCaregiver = async () => {
-    if (!caregiver || (!caregiver.caregiverUserId && !caregiver.pairCode)) {
-      await createPairCode(userName);
-      refreshCaregiver();
+    try {
+      if (!caregiver || (!caregiver.caregiverUserId && !caregiver.pairCode)) {
+        await createPairCode(userName);
+      }
+      await refreshCaregiver();
+      setCgSheet('show');
+    } catch {
+      setToast({ message: t('pushErrorGeneric'), kind: 'danger' });
     }
-    setCgSheet('show');
   };
-  const handleRegenCode = async () => { await regeneratePairCode(); refreshCaregiver(); };
-  const handleCancelCode = async () => { await cancelCaregiver(); refreshCaregiver(); setCgSheet(null); };
+  const handleRegenCode = async () => { await regeneratePairCode(); await refreshCaregiver(); };
+  const handleCancelCode = async () => { await cancelCaregiver(); await refreshCaregiver(); setCgSheet(null); };
   const handleBecomeCaregiver = () => {
     if (!pushSupported() || pushPermission() !== 'granted') { setPushSheet(true); return; }
     setCgSheet('enter');

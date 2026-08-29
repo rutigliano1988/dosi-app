@@ -5,11 +5,10 @@ interface TopBarProps {
   theme: Theme;
   title?: string;
   subtitle?: string;
-  left?: React.ReactNode;
   right?: React.ReactNode;
 }
 
-export default function TopBar({ theme, title, subtitle, left, right }: TopBarProps) {
+export default function TopBar({ theme, title, subtitle, right }: TopBarProps) {
   return (
     <div style={{
       padding: '8px 20px 12px',
@@ -32,9 +31,11 @@ export default function TopBar({ theme, title, subtitle, left, right }: TopBarPr
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-        {left}{right}
-      </div>
+      {right && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          {right}
+        </div>
+      )}
     </div>
   );
 }
