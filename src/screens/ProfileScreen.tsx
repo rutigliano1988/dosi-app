@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Theme, ThemeName } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
+import type { CaregiverRow } from '../data/types';
 import { I } from '../icons';
 import TopBar from '../components/TopBar';
 import Card from '../components/Card';
@@ -22,6 +23,13 @@ interface Props {
   pushState: 'unsupported' | 'needs-install' | 'default' | 'granted' | 'denied';
   onEnablePush: () => void;
   onDisablePush: () => void;
+  caregiver: CaregiverRow | null;
+  caredForCount: number;
+  onAddCaregiver: () => void;
+  onManageCaregiver: () => void;
+  onRemoveCaregiver: () => void;
+  onBecomeCaregiver: () => void;
+  onOpenCaredFor: () => void;
   pendingSync?: number;
   onFlushSync?: () => void;
 }
@@ -82,6 +90,8 @@ export default function ProfileScreen({
   onUserNameChange, onThemeChange, onLangChange,
   onLinkAccount, onSignIn, onSignOut, onResetData,
   pushState, onEnablePush, onDisablePush,
+  caregiver, caredForCount,
+  onAddCaregiver, onManageCaregiver, onRemoveCaregiver, onBecomeCaregiver, onOpenCaredFor,
   pendingSync = 0, onFlushSync,
 }: Props) {
   const isDark = themeName === 'dark';
@@ -229,6 +239,29 @@ export default function ProfileScreen({
             <Row theme={theme} icon={I.bell} label={t('pushRowDenied')} first />
           ) : (
             <Row theme={theme} icon={I.bell} label={t('pushRowUnsupported')} first />
+          )}
+        </Card>
+      </div>
+
+      {/* Caregiver */}
+      <div style={{ padding: '0 16px 16px' }}>
+        <SectionTitle theme={theme}>{t('cgSection')}</SectionTitle>
+        <Card theme={theme} style={{ overflow: 'hidden' }}>
+          {(() => {
+            const cg = caregiver;
+            const pending = cg && !cg.caregiverUserId && cg.pairCode;
+            const expired = pending && cg.pairCodeExpiresAt != null && Date.parse(cg.pairCodeExpiresAt) <= Date.now();
+            const hours = pending && cg.pairCodeExpiresAt
+              ? Math.max(0, Math.round((Date.parse(cg.pairCodeExpiresAt) - Date.now()) / 3_600_000))
+              : 0;
+            if (!cg) return <Row theme={theme} icon={I.heart} label={t('cgAddRow')} onPress={onAddCaregiver} first />;
+            if (cg.caregiverUserId) return <Row theme={theme} icon={I.heart} label={t('cgActiveRow', { name: cg.name || '—' })} onPress={onRemoveCaregiver} first />;
+            if (expired) return <Row theme={theme} icon={I.heart} label={t('cgExpiredRow')} onPress={onManageCaregiver} first />;
+            return <Row theme={theme} icon={I.heart} label={t('cgPendingRow', { code: cg.pairCode || '', h: hours })} onPress={onManageCaregiver} first />;
+          })()}
+          <Row theme={theme} icon={I.share} label={t('cgBecomeRow')} onPress={onBecomeCaregiver} />
+          {caredForCount > 0 && (
+            <Row theme={theme} icon={I.user} label={t('cgCaredForRow', { n: caredForCount })} onPress={onOpenCaredFor} />
           )}
         </Card>
       </div>

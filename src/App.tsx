@@ -457,6 +457,14 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           pushState={pushState}
           onEnablePush={() => { doEnablePush(); }}
           onDisablePush={() => { doDisablePush(); }}
+          // TODO Task 12: cablear caregiver
+          caregiver={null}
+          caredForCount={0}
+          onAddCaregiver={() => {}}
+          onManageCaregiver={() => {}}
+          onRemoveCaregiver={() => {}}
+          onBecomeCaregiver={() => {}}
+          onOpenCaredFor={() => {}}
           pendingSync={pendingSync}
           onFlushSync={flushSync}
         />
