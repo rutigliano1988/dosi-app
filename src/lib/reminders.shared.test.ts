@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  dueReminder, daysLeft, stockAlertDecision, expiryAlertDecision,
+  dueReminder, daysLeft, stockAlertDecision, expiryAlertDecision, caregiverMissDue,
 } from '../../supabase/functions/_shared/reminders';
 import type { Medicine } from '../../supabase/functions/_shared/types';
 
@@ -87,5 +87,26 @@ describe('expiryAlertDecision', () => {
   it('sin expiry: none, o clear si había aviso viejo', () => {
     expect(expiryAlertDecision(med({ expiry: undefined }), today, false)).toBe('none');
     expect(expiryAlertDecision(med({ expiry: undefined }), today, true)).toBe('clear');
+  });
+});
+
+describe('caregiverMissDue', () => {
+  const at = (h: number, m: number) => new Date(2026, 7, 28, h, m);
+  const base = { time: '08:00', status: 'upcoming', reminded_count: 1, reminded_at: null } as const;
+
+  it('true solo en la 2ª hora tras la toma', () => {
+    expect(caregiverMissDue({ ...base }, at(8, 59))).toBe(false);  // 59 min
+    expect(caregiverMissDue({ ...base }, at(9, 0))).toBe(true);    // 60 min
+    expect(caregiverMissDue({ ...base }, at(9, 59))).toBe(true);   // 119 min
+    expect(caregiverMissDue({ ...base }, at(10, 0))).toBe(false);  // 120 min
+  });
+
+  it('false si el paciente ni recibió sus avisos', () => {
+    expect(caregiverMissDue({ ...base, reminded_count: 0 }, at(9, 30))).toBe(false);
+  });
+
+  it('false si ya está tomada o saltada', () => {
+    expect(caregiverMissDue({ ...base, status: 'taken' }, at(9, 30))).toBe(false);
+    expect(caregiverMissDue({ ...base, status: 'skipped' }, at(9, 30))).toBe(false);
   });
 });
