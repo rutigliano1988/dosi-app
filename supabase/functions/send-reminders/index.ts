@@ -3,7 +3,7 @@
 // la zona horaria del usuario, envía avisos de toma y alertas de stock/caducidad.
 import { sbAdmin, webpushSend, type PushRow } from '../_shared/edge.ts';
 import { isoDate, nowInTz, buildTodayDoses, medState } from '../_shared/schedule.ts';
-import { dueReminder, stockAlertDecision, expiryAlertDecision, daysLeft } from '../_shared/reminders.ts';
+import { dueReminder, stockAlertDecision, expiryAlertDecision, daysLeft, caregiverMissDue } from '../_shared/reminders.ts';
 import { rowToMed, type Medicine } from '../_shared/types.ts';
 
 Deno.serve(async (req: Request) => {
@@ -28,6 +28,11 @@ Deno.serve(async (req: Request) => {
     list.push(s);
     byUser.set(s.user_id, list);
   }
+
+  // Cuidadores activos, indexados por paciente.
+  const { data: cgRows } = await sb.from('caregivers').select('*').not('caregiver_user_id', 'is', null);
+  const caregiverByOwner = new Map<string, Record<string, unknown>>();
+  for (const c of cgRows ?? []) caregiverByOwner.set(c.owner_user_id as string, c);
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
   let pushes = 0;
@@ -108,6 +113,45 @@ Deno.serve(async (req: Request) => {
           reminded_at: now.toISOString(),
         })
         .eq('id', dose.id);
+    }
+
+    // 2.5) Aviso al cuidador de tomas olvidadas.
+    const cg = caregiverByOwner.get(userId);
+    if (cg && cg.notify_on_miss !== false) {
+      const cgSubs = byUser.get(cg.caregiver_user_id as string) ?? [];
+      if (cgSubs.length > 0) {
+        for (const dose of dosesHoy ?? []) {
+          if (dose.status === 'taken' || dose.status === 'skipped') continue;
+          if (dose.caregiver_alerted_at) continue;
+          const dr = {
+            time: dose.time as string,
+            status: dose.status as string,
+            reminded_count: (dose.reminded_count ?? 0) as number,
+            reminded_at: (dose.reminded_at ?? null) as string | null,
+          };
+          if (!caregiverMissDue(dr, now)) continue;
+          const med = meds.find((m) => m.id === dose.med_id);
+          if (!med) continue;
+          const payload = {
+            kind: 'caregiver-miss',
+            title: `${cg.owner_name || 'Tu paciente'} no ha tomado su ${med.name}`,
+            body: `Toma de las ${dose.time}`,
+            tag: `cgmiss-${dose.id}`,
+            patientId: userId,
+            doseId: dose.id as string,
+            actionUrl: `${SUPABASE_URL}/functions/v1/caregiver-action`,
+          };
+          for (const s of cgSubs) {
+            const st = await webpushSend(s, JSON.stringify({ ...payload, endpoint: s.endpoint, secret: s.action_secret }));
+            if (st === 404 || st === 410) {
+              await sb.from('push_subscriptions').delete().eq('endpoint', s.endpoint);
+            } else if (st === 0) {
+              pushes++;
+            }
+          }
+          await sb.from('doses').update({ caregiver_alerted_at: now.toISOString() }).eq('id', dose.id);
+        }
+      }
     }
 
     // 3) Alertas de stock / caducidad — solo para medicinas activas.
