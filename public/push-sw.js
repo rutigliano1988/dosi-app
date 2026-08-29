@@ -6,9 +6,12 @@ self.addEventListener('push', (event) => {
   let d;
   try { d = event.data.json(); } catch { return; }
   // d = { kind, title, body, tag, doseId?, endpoint, secret, actionUrl }
-  const actions = d.kind === 'dose'
-    ? [{ action: 'take', title: 'Tomar' }, { action: 'snooze', title: 'Posponer' }]
-    : [];
+  const actions =
+    d.kind === 'dose' || d.kind === 'caregiver-nudge'
+      ? [{ action: 'take', title: 'Tomar' }, { action: 'snooze', title: 'Posponer' }]
+      : d.kind === 'caregiver-miss'
+        ? [{ action: 'cg-mark', title: 'Ya la tomó' }, { action: 'cg-nudge', title: 'Recordárselo' }]
+        : [];
   event.waitUntil(
     self.registration.showNotification(d.title, {
       body: d.body,
@@ -33,6 +36,23 @@ self.addEventListener('notificationclick', (event) => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           endpoint: d.endpoint, secret: d.secret, doseId: d.doseId, action: event.action,
+        }),
+      })
+        .then((r) => { if (!r.ok) return self.clients.openWindow('/'); })
+        .catch(() => self.clients.openWindow('/'))
+    );
+    return;
+  }
+
+  if (event.action === 'cg-mark' || event.action === 'cg-nudge') {
+    event.waitUntil(
+      fetch(d.actionUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: d.endpoint, secret: d.secret,
+          patientId: d.patientId, doseId: d.doseId,
+          action: event.action === 'cg-mark' ? 'mark' : 'nudge',
         }),
       })
         .then((r) => { if (!r.ok) return self.clients.openWindow('/'); })
