@@ -141,15 +141,21 @@ Deno.serve(async (req: Request) => {
             doseId: dose.id as string,
             actionUrl: `${SUPABASE_URL}/functions/v1/caregiver-action`,
           };
+          let cgSent = false;
           for (const s of cgSubs) {
             const st = await webpushSend(s, JSON.stringify({ ...payload, endpoint: s.endpoint, secret: s.action_secret }));
             if (st === 404 || st === 410) {
               await sb.from('push_subscriptions').delete().eq('endpoint', s.endpoint);
             } else if (st === 0) {
+              cgSent = true;
               pushes++;
             }
           }
-          await sb.from('doses').update({ caregiver_alerted_at: now.toISOString() }).eq('id', dose.id);
+          // Solo marcamos "cuidador avisado" si algo se entregó: si todo falló,
+          // se reintenta en el siguiente tick mientras siga en la 2ª hora.
+          if (cgSent) {
+            await sb.from('doses').update({ caregiver_alerted_at: now.toISOString() }).eq('id', dose.id);
+          }
         }
       }
     }

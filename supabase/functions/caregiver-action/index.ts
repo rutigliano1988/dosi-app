@@ -43,12 +43,15 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (!rel) return json({ error: 'bad-code' }, 404);
     if (rel.owner_user_id === caregiverId) return json({ error: 'self' }, 400);
-    await sb.from('caregivers').update({
+    // Condicionado a que siga sin reclamar: cierra la carrera de dos cuidadores
+    // con el mismo código (el segundo update no afecta filas → bad-code).
+    const { data: claimed } = await sb.from('caregivers').update({
       caregiver_user_id: caregiverId,
       name: (p.caregiverName ?? '').slice(0, 60) || null,
       pair_code: null,
       pair_code_expires_at: null,
-    }).eq('id', rel.id);
+    }).eq('id', rel.id).is('caregiver_user_id', null).select('id').maybeSingle();
+    if (!claimed) return json({ error: 'bad-code' }, 404);
     return json({ ok: true, patientId: rel.owner_user_id, ownerName: rel.owner_name ?? null });
   }
 
@@ -81,8 +84,9 @@ Deno.serve(async (req: Request) => {
   if (action === 'patient-today') {
     const { data: pSubs } = await sb
       .from('push_subscriptions').select('timezone, last_seen_at')
-      .eq('user_id', patientId).order('last_seen_at', { ascending: false }).limit(1);
+      .eq('user_id', patientId).order('last_seen_at', { ascending: false });
     const tz = (pSubs?.[0]?.timezone as string) || 'Europe/Madrid';
+    const patientPushOff = (pSubs ?? []).length === 0;
     const now = nowInTz(tz);
     const today = isoDate(now);
     const { data: medRows } = await sb.from('medicines').select('*').eq('user_id', patientId);
@@ -104,7 +108,11 @@ Deno.serve(async (req: Request) => {
       ownerName: rel.owner_name ?? null,
       today,
       patientNowMin: now.getHours() * 60 + now.getMinutes(),
-      medicines: medRows ?? [],
+      patientPushOff,
+      // Solo lo que pinta la pantalla; nada de stock / notas / caducidad (fuera de alcance).
+      medicines: (medRows ?? []).map((m) => ({
+        id: m.id, name: m.name, dose: m.dose, form: m.form, color: m.color,
+      })),
       doses: doseRows ?? [],
     });
   }
@@ -135,12 +143,16 @@ Deno.serve(async (req: Request) => {
       doseId: dose.id,
       actionUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/dose-action`,
     };
+    let anySent = false;
     for (const s of pSubs ?? []) {
       const st = await webpushSend(s, JSON.stringify({ ...payload, endpoint: s.endpoint, secret: s.action_secret }));
+      if (st === 0) anySent = true;
       if (st === 404 || st === 410) await sb.from('push_subscriptions').delete().eq('endpoint', s.endpoint);
     }
-    await sb.from('doses').update({ nudged_at: new Date().toISOString() }).eq('id', dose.id);
-    return json({ ok: true });
+    // Solo marcamos el cooldown si algo se entregó: si todo falló, el cuidador
+    // puede reintentar de inmediato y no se pierde el recordatorio.
+    if (anySent) await sb.from('doses').update({ nudged_at: new Date().toISOString() }).eq('id', dose.id);
+    return json({ ok: anySent, undelivered: !anySent });
   }
 
   return json({ error: 'unknown action' }, 400);
