@@ -30,6 +30,7 @@ interface Props {
   onRemoveCaregiver: () => void;
   onBecomeCaregiver: () => void;
   onOpenCaredFor: () => void;
+  onOpenReport?: () => void;
   pendingSync?: number;
   onFlushSync?: () => void;
 }
@@ -92,6 +93,7 @@ export default function ProfileScreen({
   pushState, onEnablePush, onDisablePush,
   caregiver, caredForCount,
   onAddCaregiver, onManageCaregiver, onRemoveCaregiver, onBecomeCaregiver, onOpenCaredFor,
+  onOpenReport,
   pendingSync = 0, onFlushSync,
 }: Props) {
   const isDark = themeName === 'dark';
@@ -265,6 +267,16 @@ export default function ProfileScreen({
           )}
         </Card>
       </div>
+
+      {/* History */}
+      {onOpenReport && (
+        <div style={{ padding: '0 16px 16px' }}>
+          <SectionTitle theme={theme}>{t('historySectionTitle')}</SectionTitle>
+          <Card theme={theme} style={{ overflow: 'hidden' }}>
+            <Row theme={theme} icon={I.share} label={t('reportForDoctor')} onPress={onOpenReport} first />
+          </Card>
+        </div>
+      )}
 
       {/* Accessibility */}
       <div style={{ padding: '0 16px 16px' }}>

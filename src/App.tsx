@@ -28,11 +28,12 @@ import AuthSheet from './screens/AuthSheet';
 import PushSheet from './screens/PushSheet';
 import CaregiverSheet from './screens/CaregiverSheet';
 import CaregiverScreen from './screens/CaregiverScreen';
+import ReportScreen from './screens/ReportScreen';
 import { myCaregiverRow, createPairCode, regeneratePairCode, cancelCaregiver, acceptCode, listPatients } from './lib/caregiver';
 import type { CaregiverRow } from './data/types';
 import { pushSupported, pushPermission, needsInstallFirst, enablePush, disablePush, syncPush, pushHasSubscription } from './lib/push';
 
-export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail' | 'caregiver';
+export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail' | 'caregiver' | 'report';
 export type TabId = 'home' | 'inventory' | 'calendar' | 'profile';
 
 interface AppProps {
@@ -466,6 +467,16 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         onEnablePush={() => { doEnablePush(); }}
       />
     );
+  } else if (screen === 'report') {
+    body = (
+      <ReportScreen
+        theme={theme} t={t} lang={lang}
+        meds={meds}
+        historyDoses={historyDoses}
+        userName={userName}
+        onBack={() => { setScreen('main'); setTab('profile'); }}
+      />
+    );
   } else {
     if (tab === 'home') {
       body = (
@@ -525,6 +536,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onRemoveCaregiver={() => setConfirmRemoveCg(true)}
           onBecomeCaregiver={handleBecomeCaregiver}
           onOpenCaredFor={() => setScreen('caregiver')}
+          onOpenReport={meds.length > 0 ? () => setScreen('report') : undefined}
           pendingSync={pendingSync}
           onFlushSync={flushSync}
         />
