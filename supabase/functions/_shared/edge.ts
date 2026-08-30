@@ -1,6 +1,7 @@
 // Utilidades comunes para las Edge Functions (Deno). No lo ve `src/`.
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import webpush from 'npm:web-push@3';
+import { isAllowedOrigin, CORS_FALLBACK_ORIGIN } from './cors.ts';
 
 // VAPID se configura de forma perezosa (no en la carga del módulo): así, si los
 // secretos aún no están puestos, la función responde 401/200 en vez de 500 en
@@ -73,16 +74,10 @@ export async function markDoseTaken(
   return 'ok';
 }
 
-const CORS_ALLOW = new Set([
-  'https://dosi-app.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:4173',
-]);
-
 export function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get('origin') ?? '';
   return {
-    'Access-Control-Allow-Origin': CORS_ALLOW.has(origin) ? origin : 'https://dosi-app.vercel.app',
+    'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : CORS_FALLBACK_ORIGIN,
     'Access-Control-Allow-Headers': 'content-type, authorization, apikey, x-client-info',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',
