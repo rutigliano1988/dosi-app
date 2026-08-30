@@ -213,14 +213,14 @@ export default function ProfileScreen({
           ) : (
             <>
               <Row theme={theme} icon={I.user} label={account.email} first />
-              <Row theme={theme} icon={I.back} label={t('accountSignOut')} onPress={onSignOut} danger />
+              <Row theme={theme} icon={I.logout} label={t('accountSignOut')} onPress={onSignOut} danger />
             </>
           )}
           {pendingSync > 0 && (
             <Row
               theme={theme}
               icon={I.alert}
-              label={t('syncPendingRow', { n: pendingSync })}
+              label={t(pendingSync === 1 ? 'syncPendingRowOne' : 'syncPendingRow', { n: pendingSync })}
               onPress={onFlushSync}
             />
           )}
