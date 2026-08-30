@@ -24,6 +24,15 @@ export function dueReminder(dose: DoseRow, now: Date): boolean {
   return false;
 }
 
+/** true si toca avisar al cuidador de esta toma (2ª hora tras la hora, sin marcar). */
+export function caregiverMissDue(dose: DoseRow, now: Date): boolean {
+  if (dose.status === 'taken' || dose.status === 'skipped') return false;
+  if (dose.reminded_count < 1) return false;              // el paciente ni recibió sus avisos
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const dueMin = strToMin(dose.time);
+  return nowMin >= dueMin + 60 && nowMin < dueMin + 120;  // 2ª hora tras la toma
+}
+
 /** Días de tratamiento que cubre el stock actual. */
 export function daysLeft(med: Medicine): number {
   return Math.floor(med.stock / Math.max(1, expandTimes(med).length));

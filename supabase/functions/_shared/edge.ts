@@ -50,13 +50,46 @@ export async function webpushSend(sub: PushRow, payloadJson: string): Promise<nu
   }
 }
 
-export const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': 'https://dosi-app.vercel.app',
-  'Access-Control-Allow-Headers': 'content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+/** Marca una dosis como tomada y descuenta 1 de stock. Idempotente. */
+export async function markDoseTaken(
+  sb: SupabaseClient,
+  doseId: string,
+  patientUserId: string,
+): Promise<'ok' | 'not-found'> {
+  const { data: dose } = await sb
+    .from('doses').select('med_id, status')
+    .eq('id', doseId).eq('user_id', patientUserId).maybeSingle();
+  if (!dose) return 'not-found';
+  if (dose.status === 'taken') return 'ok';
+  await sb.from('doses').update({ status: 'taken' }).eq('id', doseId);
+  const { data: med } = await sb
+    .from('medicines').select('stock')
+    .eq('id', dose.med_id).eq('user_id', patientUserId).maybeSingle();
+  if (med) {
+    await sb.from('medicines')
+      .update({ stock: Math.max(0, (med.stock ?? 0) - 1) })
+      .eq('id', dose.med_id).eq('user_id', patientUserId);
+  }
+  return 'ok';
+}
+
+const CORS_ALLOW = new Set([
+  'https://dosi-app.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:4173',
+]);
+
+export function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin') ?? '';
+  return {
+    'Access-Control-Allow-Origin': CORS_ALLOW.has(origin) ? origin : 'https://dosi-app.vercel.app',
+    'Access-Control-Allow-Headers': 'content-type, authorization, apikey, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 export function corsPreflight(req: Request): Response | null {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) });
   return null;
 }

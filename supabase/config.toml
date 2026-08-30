@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.dose-action]
 verify_jwt = false
+
+[functions.caregiver-action]
+verify_jwt = false

@@ -11,7 +11,7 @@ function isoToday(): string {
 }
 
 // Normaliza una fila de Supabase (schedule/duration son jsonb, pueden venir en formato viejo)
-function rowToMed(r: Record<string, unknown>): Medicine {
+export function rowToMed(r: Record<string, unknown>): Medicine {
   const sched = (r.schedule ?? {}) as Record<string, unknown>;
   const dur = (r.duration ?? {}) as Record<string, unknown>;
   return {
