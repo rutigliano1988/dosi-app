@@ -96,6 +96,11 @@ export function buildAdherence(
   let skipped = 0;
   let missed = 0;
 
+  // ids de tomas ya contabilizadas en un día anterior (por su fecha original).
+  // Evita el doble conteo de una fila pospuesta que cruzó medianoche: conserva
+  // su id (fecha D) pero su `date` pasó a D+1.
+  const consumed = new Set<string>();
+
   for (const dayISO of eachDayISO(fromISO, toISO)) {
     const day = isoToLocalDate(dayISO);
     const seen = new Set<string>();
@@ -103,11 +108,12 @@ export function buildAdherence(
 
     for (const e of expectedDosesOn(meds, day)) {
       const id = `${e.medId}-${dayISO}-${e.time}`;
+      consumed.add(id);
       seen.add(id);
       items.push({ medId: e.medId, time: e.time, id });
     }
     for (const r of rowsByDate.get(dayISO) ?? []) {
-      if (seen.has(r.id) || !medIds.has(r.medId)) continue;
+      if (consumed.has(r.id) || seen.has(r.id) || !medIds.has(r.medId)) continue;
       seen.add(r.id);
       items.push({ medId: r.medId, time: r.time, id: r.id });
     }
