@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.caregiver-action]
 verify_jwt = false
+
+[functions.push-resub]
+verify_jwt = false
