@@ -130,6 +130,29 @@ export async function pushDoses(doses: Dose[], userId: string) {
 
 // ─── History ─────────────────────────────────────────────────────────────────
 
+/**
+ * Fusiona una dosis recién marcada en el array `historyDoses`. Si `dose.id` ya
+ * está en el historial, mapea esa entrada a `{ ...h, status }`; si no, la añade
+ * como `{ ...dose, status, date: dateISO }`. Pura — no muta `history`.
+ *
+ * El campo `date` es imprescindible: `buildAdherence` agrupa filas por `r.date`
+ * y `CalendarScreen.dosesForDate` filtra por él. Sin él, una toma recién marcada
+ * hoy (medicina añadida hoy, o boot con `remote.doses.length === 0`) no aparece
+ * en el calendario del mes, el dato de 30 días del detalle ni el PDF del médico
+ * hasta la siguiente carga en frío.
+ */
+export function mergeHistoryDose(
+  history: Dose[],
+  dose: Dose,
+  status: 'taken' | 'skipped',
+  dateISO: string,
+): Dose[] {
+  if (history.some((h) => h.id === dose.id)) {
+    return history.map((h) => (h.id === dose.id ? { ...h, status } : h));
+  }
+  return [...history, { ...dose, status, date: dateISO }];
+}
+
 export async function pullHistory(userId: string, days = 90): Promise<import('./types').Dose[]> {
   const dates: string[] = [];
   for (let i = 0; i < days; i++) {

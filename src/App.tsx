@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getTheme, type ThemeName } from './theme/tokens';
 import { tstr, type Lang } from './i18n/strings';
-import { buildTodayDoses, shiftTime, expandTimes } from './lib/schedule';
+import { buildTodayDoses, shiftTime, expandTimes, isoDate } from './lib/schedule';
 import { readSettings, writeSettings } from './data/settings';
 import { dosiStore } from './data/store';
 import { ensureSession, getAccount, signOutToAnon, supabase } from './lib/supabase';
-import { pullAll, pullHistory, backfillHistory, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
+import { pullAll, pullHistory, backfillHistory, pushMed, deleteMed, pushDose, pushDoses, mergeHistoryDose } from './data/sync';
 import { enqueue, outboxSize, clearOutbox, flushOutbox } from './data/outbox';
 import type { Medicine, Dose } from './data/types';
 import { I } from './icons';
@@ -326,7 +326,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
     setDoses(ds => ds.map(x => x.id === doseId ? updatedDose : x));
     setMeds(ms => ms.map(m => m.id === d.medId ? updatedMed : m));
     // Also update historyDoses for today so CalendarScreen stays in sync
-    setHistoryDoses(hs => hs.map(h => h.id === doseId ? { ...h, status: 'taken' as const } : h));
+    setHistoryDoses(hs => mergeHistoryDose(hs, updatedDose, 'taken', isoDate(new Date())));
     setConfirm({ med, time: d.time });
     setNotif(null);
     persistDose(updatedDose);
@@ -355,7 +355,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
     if (!target) return;
     const updated: Dose = { ...target, status: 'skipped' };
     setDoses(ds => ds.map(x => x.id === doseId ? updated : x));
-    setHistoryDoses(hs => hs.map(h => h.id === doseId ? { ...h, status: 'skipped' as const } : h));
+    setHistoryDoses(hs => mergeHistoryDose(hs, updated, 'skipped', isoDate(new Date())));
     persistDose(updated);
   };
 
