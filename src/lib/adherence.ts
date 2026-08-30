@@ -1,5 +1,6 @@
 import type { Medicine, Dose } from '../data/types';
 import type { Lang } from '../i18n/strings';
+import { tstr } from '../i18n/strings';
 import { expectedDosesOn, isoDate } from './schedule';
 
 export type DoseOutcome = 'taken' | 'skipped' | 'missed' | 'pending';
@@ -153,7 +154,7 @@ export function buildAdherence(
 
 export function adherenceLabel(rate: number | null, lang: Lang): string {
   if (rate === null) return '—';
-  if (rate >= 0.9) return lang === 'es' ? 'Excelente' : 'Excellent';
-  if (rate >= 0.7) return lang === 'es' ? 'Buena' : 'Good';
-  return lang === 'es' ? 'Irregular' : 'Irregular';
+  if (rate >= 0.9) return tstr(lang, 'adhExcellent');
+  if (rate >= 0.7) return tstr(lang, 'adhGood');
+  return tstr(lang, 'adhIrregular');
 }

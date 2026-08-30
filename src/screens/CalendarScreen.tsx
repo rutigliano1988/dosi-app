@@ -262,6 +262,9 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 26, fontWeight: 700, color: theme.text, fontFamily: '"Instrument Serif", Georgia, serif' }}>
                     {monthView.summary.rate === null ? '—' : Math.round(monthView.summary.rate * 100) + '%'}
+                    {monthView.summary.rate !== null && (
+                      <span style={{ fontSize: 13, fontWeight: 400, color: theme.textDim }}> · {adherenceLabel(monthView.summary.rate, lang)}</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12.5, color: theme.textDim }}>
                     {monthView.summary.skipped} {t('skippedCountLabel')} · {monthView.summary.missed} {t('missedCountLabel')} · {monthView.summary.taken + monthView.summary.missed} {t('dosesThisMonth')}
