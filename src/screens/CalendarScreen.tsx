@@ -5,7 +5,7 @@ import type { Lang } from '../i18n/strings';
 import { tArr } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
 import { isoDate } from '../lib/schedule';
-import { buildAdherence } from '../lib/adherence';
+import { buildAdherence, adherenceLabel } from '../lib/adherence';
 import { I } from '../icons';
 import TopBar from '../components/TopBar';
 import Card from '../components/Card';
@@ -20,7 +20,7 @@ interface Props {
   lang: Lang;
   meds: Medicine[];
   doses: Dose[];         // today's live doses
-  historyDoses: Dose[];  // last 7 days from Supabase (have .date field)
+  historyDoses: Dose[];  // last 90 days from Supabase (have .date field)
 }
 
 function buildWeek() {
@@ -46,22 +46,11 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
     return historyDoses.filter(d => d.date === dateStr);
   }
 
-  // Build per-day adherence data
-  const weekData = useMemo(() => week.map(d => {
-    const dateStr = isoDate(d);
-    const dayDoses = dosesForDate(dateStr);
-    const isFuture = dateStr > todayStr;
-    const taken = dayDoses.filter(d => d.status === 'taken').length;
-    const total = isFuture ? 0 : dayDoses.filter(d => d.status !== 'upcoming').length;
-    return { date: d, dateStr, taken, total, isFuture };
-  }), [week, doses, historyDoses, todayStr]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Weekly adherence summary
-  const weekTotals = useMemo(() => {
-    const taken = weekData.reduce((acc, d) => acc + d.taken, 0);
-    const total = weekData.reduce((acc, d) => acc + d.total, 0);
-    return { taken, total, pct: total > 0 ? taken / total : 0 };
-  }, [weekData]);
+  // Adherencia de la semana (mismo motor que la vista Mes).
+  const weekAdh = useMemo(
+    () => buildAdherence(meds, historyDoses, isoDate(week[0]), todayStr, new Date()),
+    [meds, historyDoses, todayStr], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   // Timeline for selected day
   const selectedDateStr = isoDate(week[selected]);
@@ -129,9 +118,19 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
             <Card theme={theme} style={{ padding: '16px 10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 {week.map((d, i) => {
-                  const wd = weekData[i];
-                  const pct = wd.total > 0 ? wd.taken / wd.total : 0;
+                  const da = weekAdh.perDay[i];
+                  const due = da ? da.taken + da.missed + da.skipped : 0;
+                  const isFuture = isoDate(d) > todayStr;
                   const sel = selected === i;
+                  let dot: JSX.Element;
+                  if (isFuture || !da || due === 0) {
+                    dot = <div style={{ width: 8, height: 8, borderRadius: 4, background: sel ? 'rgba(0,0,0,0.15)' : theme.border }} />;
+                  } else if (da.missed + da.skipped === 0) {
+                    dot = <div style={{ width: 9, height: 9, borderRadius: 5, background: sel ? (theme.dark ? '#1c1812' : '#fff') : theme.success }} />;
+                  } else {
+                    dot = <ProgressRing theme={theme} value={da.taken / due} size={22} stroke={3}
+                            color={sel ? (theme.dark ? '#1c1812' : '#fff') : theme.success} showLabel={false} />;
+                  }
                   return (
                     <button key={i} onClick={() => setSelected(i)} style={{
                       width: 40, padding: '6px 4px', borderRadius: 14, border: 0,
@@ -140,30 +139,9 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
                       cursor: 'pointer', fontFamily: 'inherit',
                     }}>
-                      <div style={{ fontSize: 11.5, fontWeight: 600, opacity: 0.7 }}>
-                        {days[(d.getDay() + 6) % 7]}
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-                        {d.getDate()}
-                      </div>
-                      <div>
-                        {wd.isFuture ? (
-                          <div style={{
-                            width: 8, height: 8, borderRadius: 4,
-                            background: sel ? 'rgba(0,0,0,0.2)' : theme.borderStrong,
-                          }} />
-                        ) : wd.total === 0 ? (
-                          <div style={{
-                            width: 8, height: 8, borderRadius: 4,
-                            background: sel ? 'rgba(0,0,0,0.15)' : theme.border,
-                          }} />
-                        ) : (
-                          <ProgressRing
-                            theme={theme} value={pct} size={22} stroke={3}
-                            color={sel ? (theme.dark ? '#1c1812' : '#fff') : theme.success}
-                          />
-                        )}
-                      </div>
+                      <div style={{ fontSize: 11.5, fontWeight: 600, opacity: 0.7 }}>{days[(d.getDay() + 6) % 7]}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{d.getDate()}</div>
+                      <div>{dot}</div>
                     </button>
                   );
                 })}
@@ -175,7 +153,7 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
           <div style={{ padding: '0 16px 16px' }}>
             <Card theme={theme} style={{ padding: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <ProgressRing theme={theme} value={weekTotals.pct} size={72} color={theme.success} />
+                <ProgressRing theme={theme} value={weekAdh.rate ?? 0} size={72} color={theme.success} />
                 <div style={{ flex: 1 }}>
                   <div style={{
                     fontSize: 12.5, color: theme.textDim, fontWeight: 700,
@@ -187,10 +165,13 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
                     fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: -0.4,
                     fontFamily: '"Instrument Serif", Georgia, serif',
                   }}>
-                    {weekTotals.total > 0 ? Math.round(weekTotals.pct * 100) : '--'}%
+                    {weekAdh.rate === null ? '—' : Math.round(weekAdh.rate * 100) + '%'}
+                    {weekAdh.rate !== null && (
+                      <span style={{ fontSize: 14, fontFamily: 'inherit', color: theme.textDim }}> · {adherenceLabel(weekAdh.rate, lang)}</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12.5, color: theme.textDim }}>
-                    {weekTotals.taken} / {weekTotals.total} {lang === 'es' ? 'dosis · esta semana' : 'doses · this week'}
+                    {weekAdh.skipped} {t('skippedCountLabel')} · {weekAdh.missed} {t('missedCountLabel')} · {weekAdh.taken + weekAdh.missed} {lang === 'es' ? 'dosis · esta semana' : 'doses · this week'}
                   </div>
                 </div>
               </div>
@@ -281,6 +262,9 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 26, fontWeight: 700, color: theme.text, fontFamily: '"Instrument Serif", Georgia, serif' }}>
                     {monthView.summary.rate === null ? '—' : Math.round(monthView.summary.rate * 100) + '%'}
+                    {monthView.summary.rate !== null && (
+                      <span style={{ fontSize: 13, fontWeight: 400, color: theme.textDim }}> · {adherenceLabel(monthView.summary.rate, lang)}</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12.5, color: theme.textDim }}>
                     {monthView.summary.skipped} {t('skippedCountLabel')} · {monthView.summary.missed} {t('missedCountLabel')} · {monthView.summary.taken + monthView.summary.missed} {t('dosesThisMonth')}

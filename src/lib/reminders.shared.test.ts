@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   dueReminder, daysLeft, stockAlertDecision, expiryAlertDecision, caregiverMissDue,
+  snoozePatch, deliveredAny, sendSettled,
 } from '../../supabase/functions/_shared/reminders';
 import type { Medicine } from '../../supabase/functions/_shared/types';
 
@@ -126,5 +127,53 @@ describe('caregiverMissDue', () => {
     expect(caregiverMissDue(late, at(23, 45), 0)).toBe(true);  // 75 min, mismo día
     expect(caregiverMissDue(late, at(0, 15), 1)).toBe(true);   // 105 min, día siguiente
     expect(caregiverMissDue(late, at(0, 31), 1)).toBe(false);  // 121 min
+  });
+});
+
+describe('snoozePatch', () => {
+  it('sin cruce de medianoche: no incluye date', () => {
+    const p = snoozePatch({ time: '08:00', date: '2026-08-30' }, 10);
+    expect(p).toEqual({ time: '08:10', total_min: 490, reminded_count: 0, reminded_at: null });
+    expect('date' in p).toBe(false);
+  });
+  it('cruza medianoche: date sube un día', () => {
+    const p = snoozePatch({ time: '23:55', date: '2026-08-30' }, 10);
+    expect(p).toEqual({ time: '00:05', total_min: 5, reminded_count: 0, reminded_at: null, date: '2026-08-31' });
+  });
+  it('cruza fin de año', () => {
+    const p = snoozePatch({ time: '23:58', date: '2026-12-31' }, 10);
+    expect(p.date).toBe('2027-01-01');
+    expect(p.time).toBe('00:08');
+  });
+});
+
+describe('deliveredAny', () => {
+  it('true si algún status es 0', () => {
+    expect(deliveredAny([0])).toBe(true);
+    expect(deliveredAny([410, 0])).toBe(true);
+  });
+  it('false si ninguno entregó', () => {
+    expect(deliveredAny([])).toBe(false);
+    expect(deliveredAny([500, 502])).toBe(false);
+    expect(deliveredAny([404, 410])).toBe(false);
+  });
+});
+
+describe('sendSettled', () => {
+  it('true si algo se entregó', () => {
+    expect(sendSettled([0])).toBe(true);
+    expect(sendSettled([500, 0])).toBe(true);
+    expect(sendSettled([404, 0])).toBe(true);
+  });
+  it('true si todos los fallos son 4xx definitivos', () => {
+    expect(sendSettled([404])).toBe(true);
+    expect(sendSettled([410, 403])).toBe(true);
+  });
+  it('false si algún fallo es transitorio (5xx) y nada se entregó', () => {
+    expect(sendSettled([500])).toBe(false);
+    expect(sendSettled([502, 404])).toBe(false);
+  });
+  it('false con lista vacía', () => {
+    expect(sendSettled([])).toBe(false);
   });
 });

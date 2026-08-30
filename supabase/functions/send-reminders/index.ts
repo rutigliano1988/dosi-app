@@ -3,7 +3,7 @@
 // la zona horaria del usuario, envía avisos de toma y alertas de stock/caducidad.
 import { sbAdmin, webpushSend, type PushRow } from '../_shared/edge.ts';
 import { isoDate, nowInTz, buildTodayDoses, medState } from '../_shared/schedule.ts';
-import { dueReminder, stockAlertDecision, expiryAlertDecision, daysLeft, caregiverMissDue } from '../_shared/reminders.ts';
+import { dueReminder, stockAlertDecision, expiryAlertDecision, daysLeft, caregiverMissDue, deliveredAny, sendSettled } from '../_shared/reminders.ts';
 import { rowToMed, type Medicine } from '../_shared/types.ts';
 
 Deno.serve(async (req: Request) => {
@@ -95,11 +95,13 @@ Deno.serve(async (req: Request) => {
         actionUrl: `${SUPABASE_URL}/functions/v1/dose-action`,
       };
 
+      const statuses: number[] = [];
       for (const sub of userSubs) {
         const status = await webpushSend(
           sub,
           JSON.stringify({ ...payload, endpoint: sub.endpoint, secret: sub.action_secret }),
         );
+        statuses.push(status);
         if (status === 404 || status === 410) {
           await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
         } else if (status === 0) {
@@ -107,12 +109,14 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      await sb.from('doses')
-        .update({
-          reminded_count: ((dose.reminded_count ?? 0) as number) + 1,
-          reminded_at: now.toISOString(),
-        })
-        .eq('id', dose.id);
+      if (deliveredAny(statuses)) {
+        await sb.from('doses')
+          .update({
+            reminded_count: ((dose.reminded_count ?? 0) as number) + 1,
+            reminded_at: now.toISOString(),
+          })
+          .eq('id', dose.id);
+      }
     }
 
     // 2.5) Aviso al cuidador de tomas olvidadas.
@@ -182,6 +186,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       const stockDec = stockAlertDecision(med, Boolean(stockSent.data));
       if (stockDec === 'send') {
+        const statuses: number[] = [];
         for (const sub of userSubs) {
           const st = await webpushSend(sub, JSON.stringify({
             kind: 'stock',
@@ -191,16 +196,19 @@ Deno.serve(async (req: Request) => {
             endpoint: sub.endpoint,
             secret: sub.action_secret,
           }));
+          statuses.push(st);
           if (st === 404 || st === 410) {
             await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
           } else if (st === 0) {
             pushes++;
           }
         }
-        await sb.from('sent_alerts').upsert(
-          { user_id: userId, med_id: med.id, kind: 'stock', sent_at: new Date().toISOString() },
-          { onConflict: 'user_id,med_id,kind' },
-        );
+        if (sendSettled(statuses)) {
+          await sb.from('sent_alerts').upsert(
+            { user_id: userId, med_id: med.id, kind: 'stock', sent_at: new Date().toISOString() },
+            { onConflict: 'user_id,med_id,kind' },
+          );
+        }
       } else if (stockDec === 'clear') {
         await sb.from('sent_alerts').delete()
           .eq('user_id', userId).eq('med_id', med.id).eq('kind', 'stock');
@@ -213,6 +221,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       const expDec = expiryAlertDecision(med, now, Boolean(expSent.data));
       if (expDec === 'send') {
+        const statuses: number[] = [];
         for (const sub of userSubs) {
           const st = await webpushSend(sub, JSON.stringify({
             kind: 'expiry',
@@ -222,16 +231,19 @@ Deno.serve(async (req: Request) => {
             endpoint: sub.endpoint,
             secret: sub.action_secret,
           }));
+          statuses.push(st);
           if (st === 404 || st === 410) {
             await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
           } else if (st === 0) {
             pushes++;
           }
         }
-        await sb.from('sent_alerts').upsert(
-          { user_id: userId, med_id: med.id, kind: 'expiry', sent_at: new Date().toISOString() },
-          { onConflict: 'user_id,med_id,kind' },
-        );
+        if (sendSettled(statuses)) {
+          await sb.from('sent_alerts').upsert(
+            { user_id: userId, med_id: med.id, kind: 'expiry', sent_at: new Date().toISOString() },
+            { onConflict: 'user_id,med_id,kind' },
+          );
+        }
       } else if (expDec === 'clear') {
         await sb.from('sent_alerts').delete()
           .eq('user_id', userId).eq('med_id', med.id).eq('kind', 'expiry');

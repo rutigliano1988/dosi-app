@@ -3,7 +3,7 @@ import type { Lang } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
 import { PILL_COLORS } from '../theme/tokens';
 import { expandTimes, isoDate, medState, treatmentDay } from '../lib/schedule';
-import { buildAdherence } from '../lib/adherence';
+import { buildAdherence, adherenceLabel } from '../lib/adherence';
 import { I } from '../icons';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -24,7 +24,7 @@ interface Props {
   onDelete: () => void;
 }
 
-export default function DetailScreen({ theme, t, med, historyDoses, onBack, onShowStockAlert, onEdit, onResumeExtend, onPauseToggle, onDelete }: Props) {
+export default function DetailScreen({ theme, t, lang, med, historyDoses, onBack, onShowStockAlert, onEdit, onResumeExtend, onPauseToggle, onDelete }: Props) {
   if (!med) {
     return (
       <div style={{ padding: '8px 16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -223,6 +223,9 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
                 <span style={{ fontSize: 13, color: theme.textDim }}>{t('adherence30')}</span>
                 <span style={{ fontSize: 20, fontWeight: 700, color: theme.text, fontFamily: '"Instrument Serif", Georgia, serif' }}>
                   {am!.rate === null ? '—' : Math.round(am!.rate * 100) + '%'}
+                  {am!.rate !== null && (
+                    <span style={{ fontSize: 13, fontFamily: 'inherit', color: theme.textDim }}> · {adherenceLabel(am!.rate, lang)}</span>
+                  )}
                 </span>
               </div>
               {(am!.skipped > 0 || am!.missed > 0) && (

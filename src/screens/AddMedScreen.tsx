@@ -94,7 +94,7 @@ function StepBasics({ theme, t, data, upd }: { theme: Theme; t: Props['t']; data
         <TextInput theme={theme} value={data.name} onChange={v => upd('name', v)} placeholder={t('namePlaceholder')} big />
       </Field>
       <Field theme={theme} label={t('dose')}>
-        <TextInput theme={theme} value={data.dose} onChange={v => upd('dose', v)} placeholder="500 mg" />
+        <TextInput theme={theme} value={data.dose} onChange={v => upd('dose', v)} placeholder={t('dosePlaceholder')} />
       </Field>
       <Field theme={theme} label={t('form')}>
         <SegmentedRow theme={theme} value={data.form} onChange={v => upd('form', v)} options={[
@@ -367,7 +367,7 @@ export default function AddMedScreen({ theme, t, mode = 'add', initialData, onCa
   const [step, setStep] = useState(0);
   const [data, setData] = useState<FormData>({
     name:          initialData?.name ?? '',
-    dose:          initialData?.dose ?? '500 mg',
+    dose:          initialData?.dose ?? '',
     form:          initialData?.form ?? 'capsule',
     color:         initialData?.color ?? 'coral',
     freq:          initialData?.schedule?.freq ?? 'daily',

@@ -105,6 +105,21 @@ describe('buildAdherence', () => {
       .toEqual(['2026-08-27', '2026-08-28']);
   });
 
+  it('no cuenta 2 veces una toma pospuesta que cruzó medianoche', () => {
+    const m = med({ schedule: { freq: 'daily', times: ['23:55'] } });
+    // dose-action pospuso la toma del 30 a las 00:05 del 31: la fila conserva su
+    // id (segmento de fecha = 30) pero `date` pasa a 31 y `time` a 00:05.
+    const moved: Dose = {
+      id: 'm1-2026-08-30-23:55', medId: 'm1', time: '00:05',
+      totalMin: 5, status: 'taken', date: '2026-08-31',
+    };
+    const at = new Date(2026, 7, 31, 12, 0);
+    const a = buildAdherence([m], [moved], '2026-08-30', '2026-08-31', at);
+    expect(a.taken).toBe(1);
+    expect(a.perDay.find(d => d.date === '2026-08-30')).toMatchObject({ taken: 1 });
+    expect(a.perDay.find(d => d.date === '2026-08-31')).toMatchObject({ taken: 0 });
+  });
+
   it('perMed en el orden de `meds`, solo con dosis esperadas', () => {
     const a = med({ id: 'a', schedule: { freq: 'weekdays', times: ['08:00'], weekdays: [1] } });
     const b = med({ id: 'b' });

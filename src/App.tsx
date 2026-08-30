@@ -567,7 +567,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
             padding: '6px 12px', cursor: 'pointer', textAlign: 'center',
           }}
         >
-          {t('syncPending', { n: pendingSync })}
+          {t(pendingSync === 1 ? 'syncPendingOne' : 'syncPending', { n: pendingSync })}
         </button>
       )}
 

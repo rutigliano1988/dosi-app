@@ -1,5 +1,6 @@
 import type { Medicine, Dose } from '../data/types';
 import type { Lang } from '../i18n/strings';
+import { tstr } from '../i18n/strings';
 import { expectedDosesOn, isoDate } from './schedule';
 
 export type DoseOutcome = 'taken' | 'skipped' | 'missed' | 'pending';
@@ -95,6 +96,11 @@ export function buildAdherence(
   let skipped = 0;
   let missed = 0;
 
+  // ids de tomas ya contabilizadas en un día anterior (por su fecha original).
+  // Evita el doble conteo de una fila pospuesta que cruzó medianoche: conserva
+  // su id (fecha D) pero su `date` pasó a D+1.
+  const consumed = new Set<string>();
+
   for (const dayISO of eachDayISO(fromISO, toISO)) {
     const day = isoToLocalDate(dayISO);
     const seen = new Set<string>();
@@ -102,11 +108,12 @@ export function buildAdherence(
 
     for (const e of expectedDosesOn(meds, day)) {
       const id = `${e.medId}-${dayISO}-${e.time}`;
+      consumed.add(id);
       seen.add(id);
       items.push({ medId: e.medId, time: e.time, id });
     }
     for (const r of rowsByDate.get(dayISO) ?? []) {
-      if (seen.has(r.id) || !medIds.has(r.medId)) continue;
+      if (consumed.has(r.id) || seen.has(r.id) || !medIds.has(r.medId)) continue;
       seen.add(r.id);
       items.push({ medId: r.medId, time: r.time, id: r.id });
     }
@@ -153,7 +160,7 @@ export function buildAdherence(
 
 export function adherenceLabel(rate: number | null, lang: Lang): string {
   if (rate === null) return '—';
-  if (rate >= 0.9) return lang === 'es' ? 'Excelente' : 'Excellent';
-  if (rate >= 0.7) return lang === 'es' ? 'Buena' : 'Good';
-  return lang === 'es' ? 'Irregular' : 'Irregular';
+  if (rate >= 0.9) return tstr(lang, 'adhExcellent');
+  if (rate >= 0.7) return tstr(lang, 'adhGood');
+  return tstr(lang, 'adhIrregular');
 }

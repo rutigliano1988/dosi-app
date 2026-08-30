@@ -115,6 +115,13 @@ const share: IconFn = (s = 20, c = 'currentColor') => (
   </svg>
 );
 
+const logout: IconFn = (s = 22, c = 'currentColor') => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M15 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h9" stroke={c} strokeWidth="1.7" strokeLinecap="round"/>
+    <path d="M10 12h11M17 8l4 4-4 4" stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const edit: IconFn = (s = 20, c = 'currentColor') => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
     <path d="M4 20h4l11-11-4-4L4 16v4z" stroke={c} strokeWidth="1.7" strokeLinejoin="round"/>
@@ -170,5 +177,5 @@ const syrup: IconFn = (s = 22, c = 'currentColor') => (
 export const I = {
   pill, check, plus, home, box, cal, user, bell, clock,
   search, back, close, chev, more, alert, heart, share,
-  edit, trash, pause, drop, sun, moon, globe, syrup,
+  edit, trash, pause, drop, sun, moon, globe, syrup, logout,
 };

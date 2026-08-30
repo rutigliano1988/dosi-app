@@ -3,7 +3,7 @@
 // notificación. Identidad por `endpoint` + `action_secret` (verify_jwt=false), sin
 // sesión de usuario. `take` es idempotente; `snooze` mueve +10 min.
 import { sbAdmin, corsHeaders, corsPreflight, markDoseTaken } from '../_shared/edge.ts';
-import { shiftTime, strToMin } from '../_shared/schedule.ts';
+import { snoozePatch } from '../_shared/reminders.ts';
 
 const json = (req: Request, body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -50,11 +50,8 @@ Deno.serve(async (req: Request) => {
     return json(req, { ok: r === 'ok' }, r === 'ok' ? 200 : 404);
   }
 
-  // snooze: +10 min, recalcula total_min y resetea el contador de avisos.
-  const nt = shiftTime(dose.time, 10);
-  await sb
-    .from('doses')
-    .update({ time: nt, total_min: strToMin(nt), reminded_count: 0, reminded_at: null })
-    .eq('id', doseId);
+  // snooze: +10 min. Si cruza medianoche, snoozePatch también sube `date`.
+  const { error } = await sb.from('doses').update(snoozePatch(dose, 10)).eq('id', doseId);
+  if (error) return json(req, { error: 'update-failed' }, 500);
   return json(req, { ok: true });
 });
