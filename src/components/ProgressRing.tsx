@@ -6,9 +6,10 @@ interface ProgressRingProps {
   size?: number;
   stroke?: number;
   color?: string;
+  showLabel?: boolean;
 }
 
-export default function ProgressRing({ theme, value, size = 64, stroke = 6, color }: ProgressRingProps) {
+export default function ProgressRing({ theme, value, size = 64, stroke = 6, color, showLabel = true }: ProgressRingProps) {
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
   const offset = circumference * (1 - Math.min(Math.max(value, 0), 1));
@@ -32,14 +33,16 @@ export default function ProgressRing({ theme, value, size = 64, stroke = 6, colo
           style={{ transition: 'stroke-dashoffset .5s ease' }}
         />
       </svg>
-      <div style={{
-        position: 'absolute', inset: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: size > 60 ? 17 : 13, fontWeight: 700,
-        color: theme.text, letterSpacing: -0.3,
-      }}>
-        {Math.round(value * 100)}%
-      </div>
+      {showLabel !== false && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: size > 60 ? 17 : 13, fontWeight: 700,
+          color: theme.text, letterSpacing: -0.3,
+        }}>
+          {Math.round(value * 100)}%
+        </div>
+      )}
     </div>
   );
 }

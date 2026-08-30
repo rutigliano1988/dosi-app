@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getTheme, type ThemeName } from './theme/tokens';
 import { tstr, type Lang } from './i18n/strings';
-import { buildTodayDoses, shiftTime, expandTimes } from './lib/schedule';
+import { buildTodayDoses, shiftTime, expandTimes, isoDate } from './lib/schedule';
 import { readSettings, writeSettings } from './data/settings';
 import { dosiStore } from './data/store';
 import { ensureSession, getAccount, signOutToAnon, supabase } from './lib/supabase';
-import { pullAll, pullHistory, pushMed, deleteMed, pushDose, pushDoses } from './data/sync';
+import { pullAll, pullHistory, backfillHistory, pushMed, deleteMed, pushDose, pushDoses, mergeHistoryDose } from './data/sync';
 import { enqueue, outboxSize, clearOutbox, flushOutbox } from './data/outbox';
 import type { Medicine, Dose } from './data/types';
 import { I } from './icons';
@@ -28,11 +28,12 @@ import AuthSheet from './screens/AuthSheet';
 import PushSheet from './screens/PushSheet';
 import CaregiverSheet from './screens/CaregiverSheet';
 import CaregiverScreen from './screens/CaregiverScreen';
+import ReportScreen from './screens/ReportScreen';
 import { myCaregiverRow, createPairCode, regeneratePairCode, cancelCaregiver, acceptCode, listPatients } from './lib/caregiver';
 import type { CaregiverRow } from './data/types';
 import { pushSupported, pushPermission, needsInstallFirst, enablePush, disablePush, syncPush, pushHasSubscription } from './lib/push';
 
-export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail' | 'caregiver';
+export type ScreenId = 'onboarding' | 'main' | 'addMed' | 'detail' | 'caregiver' | 'report';
 export type TabId = 'home' | 'inventory' | 'calendar' | 'profile';
 
 interface AppProps {
@@ -171,7 +172,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
 
       const [remote, history] = await Promise.all([
         pullAll(uid),
-        pullHistory(uid, 7),
+        pullHistory(uid, 90),
       ]);
 
       setHistoryDoses(history);
@@ -185,6 +186,10 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           setDoses(fresh);
           pushDoses(fresh, uid);
         }
+        // Rellena huecos del historial sin bloquear; refresca si insertó algo.
+        backfillHistory(uid, remote.meds, 90)
+          .then((n) => { if (n > 0) pullHistory(uid, 90).then(setHistoryDoses); })
+          .catch(() => {});
       }
       // sin else: remoto vacío → el usuario empieza vacío; el primer pushMed
       // ocurre cuando crea su primera medicina
@@ -321,7 +326,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
     setDoses(ds => ds.map(x => x.id === doseId ? updatedDose : x));
     setMeds(ms => ms.map(m => m.id === d.medId ? updatedMed : m));
     // Also update historyDoses for today so CalendarScreen stays in sync
-    setHistoryDoses(hs => hs.map(h => h.id === doseId ? { ...h, status: 'taken' as const } : h));
+    setHistoryDoses(hs => mergeHistoryDose(hs, updatedDose, 'taken', isoDate(new Date())));
     setConfirm({ med, time: d.time });
     setNotif(null);
     persistDose(updatedDose);
@@ -350,6 +355,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
     if (!target) return;
     const updated: Dose = { ...target, status: 'skipped' };
     setDoses(ds => ds.map(x => x.id === doseId ? updated : x));
+    setHistoryDoses(hs => mergeHistoryDose(hs, updated, 'skipped', isoDate(new Date())));
     persistDose(updated);
   };
 
@@ -461,6 +467,16 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
         onEnablePush={() => { doEnablePush(); }}
       />
     );
+  } else if (screen === 'report') {
+    body = (
+      <ReportScreen
+        theme={theme} t={t} lang={lang}
+        meds={meds}
+        historyDoses={historyDoses}
+        userName={userName}
+        onBack={() => { setScreen('main'); setTab('profile'); }}
+      />
+    );
   } else {
     if (tab === 'home') {
       body = (
@@ -520,6 +536,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
           onRemoveCaregiver={() => setConfirmRemoveCg(true)}
           onBecomeCaregiver={handleBecomeCaregiver}
           onOpenCaredFor={() => setScreen('caregiver')}
+          onOpenReport={meds.length > 0 ? () => setScreen('report') : undefined}
           pendingSync={pendingSync}
           onFlushSync={flushSync}
         />
@@ -631,7 +648,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
                 })();
               }
               flushOutbox(newUid).then(setPendingSync);
-              const [remote, history] = await Promise.all([pullAll(newUid), pullHistory(newUid, 7)]);
+              const [remote, history] = await Promise.all([pullAll(newUid), pullHistory(newUid, 90)]);
               const rMeds = remote?.meds ?? [];
               const rDoses = (remote?.doses && remote.doses.length > 0)
                 ? remote.doses
@@ -641,6 +658,12 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
               setHistoryDoses(history);
               if ((!remote?.doses || remote.doses.length === 0) && rMeds.length > 0) {
                 pushDoses(rDoses, newUid);
+              }
+              if (rMeds.length > 0) {
+                // Rellena huecos del historial sin bloquear; refresca si insertó algo.
+                backfillHistory(newUid, rMeds, 90)
+                  .then((n) => { if (n > 0) pullHistory(newUid, 90).then(setHistoryDoses); })
+                  .catch(() => {});
               }
               setAccount(await getAccount());
               refreshCaregiver();

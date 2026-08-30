@@ -3,6 +3,7 @@ import type { Lang } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
 import { PILL_COLORS } from '../theme/tokens';
 import { expandTimes, isoDate, medState, treatmentDay } from '../lib/schedule';
+import { buildAdherence } from '../lib/adherence';
 import { I } from '../icons';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -64,6 +65,11 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
     d.date === isoToday ? t('historyToday')
     : d.date === isoYesterday ? t('historyYesterday')
     : (d.date ?? '');
+
+  const from30 = isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
+  const adh = buildAdherence([med], historyDoses, from30, isoToday, now);
+  const am = adh.perMed[0] ?? null;
+  const hasAdh = am !== null && (am.taken + am.missed + am.skipped) > 0;
 
   return (
     <div style={{ paddingBottom: 100 }}>
@@ -211,6 +217,38 @@ export default function DetailScreen({ theme, t, med, historyDoses, onBack, onSh
           <div style={{ fontSize: 12.5, fontWeight: 700, color: theme.textDim, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 }}>
             {t('history')}
           </div>
+          {hasAdh && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, color: theme.textDim }}>{t('adherence30')}</span>
+                <span style={{ fontSize: 20, fontWeight: 700, color: theme.text, fontFamily: '"Instrument Serif", Georgia, serif' }}>
+                  {am!.rate === null ? '—' : Math.round(am!.rate * 100) + '%'}
+                </span>
+              </div>
+              {(am!.skipped > 0 || am!.missed > 0) && (
+                <div style={{ fontSize: 12, color: theme.textDim, marginTop: 2 }}>
+                  {am!.skipped} {t('skippedCountLabel')} · {am!.missed} {t('missedCountLabel')}
+                </div>
+              )}
+              {/* tira de 30 días */}
+              <div style={{ display: 'flex', gap: 2, marginTop: 10 }}>
+                {adh.perDay.map((d, i) => {
+                  const due = d.taken + d.missed + d.skipped;
+                  const bg = due === 0 ? theme.border
+                    : d.missed + d.skipped === 0 ? theme.success
+                    : d.taken === 0 ? theme.danger
+                    : theme.warn;
+                  const isToday = i === adh.perDay.length - 1;
+                  return (
+                    <div key={d.date} title={d.date} style={{
+                      flex: 1, height: 22, borderRadius: 3, background: bg,
+                      outline: isToday ? `2px solid ${theme.text}` : 'none', outlineOffset: 1,
+                    }} />
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {history.length === 0 ? (
             <div style={{ textAlign: 'center', color: theme.textDim, fontSize: 14, padding: '14px 0' }}>
               {t('noHistoryYet')}
