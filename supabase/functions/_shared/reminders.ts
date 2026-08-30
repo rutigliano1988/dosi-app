@@ -1,5 +1,5 @@
 import type { Medicine } from './types.ts';
-import { expandTimes, strToMin, daysBetween, isoDate } from './schedule.ts';
+import { expandTimes, strToMin, daysBetween, isoDate, shiftTime } from './schedule.ts';
 
 export interface DoseRow {
   time: string;
@@ -59,4 +59,28 @@ export function expiryAlertDecision(med: Medicine, today: Date, alreadySent: boo
   if (dUntil > 0 && dUntil <= 7 && !alreadySent) return 'send';
   if ((dUntil <= 0 || dUntil > 7) && alreadySent) return 'clear';
   return 'none';
+}
+
+/**
+ * Campos a actualizar en `doses` al posponer `mins` minutos. Si la nueva hora
+ * cae en el día siguiente (cruzó medianoche), incluye `date`. Puro.
+ */
+export function snoozePatch(
+  dose: { time: string; date: string },
+  mins: number,
+): { time: string; total_min: number; reminded_count: 0; reminded_at: null; date?: string } {
+  const nt = shiftTime(dose.time, mins);
+  const base = { time: nt, total_min: strToMin(nt), reminded_count: 0 as const, reminded_at: null };
+  if (strToMin(nt) < strToMin(dose.time)) {
+    const [y, m, d] = dose.date.split('-').map(Number);
+    const next = new Date(y, m - 1, d + 1);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return { ...base, date: `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}` };
+  }
+  return base;
+}
+
+/** true si al menos un envío web-push se entregó (status 0 de webpushSend). */
+export function deliveredAny(statuses: number[]): boolean {
+  return statuses.some((s) => s === 0);
 }
