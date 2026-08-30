@@ -88,6 +88,15 @@ export async function deleteMed(id: string) {
 
 // ─── Doses ───────────────────────────────────────────────────────────────────
 
+// 'missed' es un estado derivado solo para la UI (buildTodayDoses lo calcula a
+// partir de la hora). La columna doses.status tiene un CHECK que solo admite
+// 'upcoming'|'now'|'taken'|'skipped', así que una toma pasada sin marcar se
+// persiste como 'upcoming' — su último estado real. Los Edge Functions ya hacen
+// lo mismo (hardcodean 'upcoming' en sus upserts).
+export function persistedStatus(status: Dose['status']): Exclude<Dose['status'], 'missed'> {
+  return status === 'missed' ? 'upcoming' : status;
+}
+
 export async function pushDose(dose: Dose, userId: string) {
   const { error } = await supabase.from('doses').upsert({
     id:        dose.id,
@@ -96,7 +105,7 @@ export async function pushDose(dose: Dose, userId: string) {
     date:      isoToday(),
     time:      dose.time,
     total_min: dose.totalMin,
-    status:    dose.status,
+    status:    persistedStatus(dose.status),
   }, { onConflict: 'id' });
   if (error) throw new Error(error.message);
 }
@@ -112,7 +121,7 @@ export async function pushDoses(doses: Dose[], userId: string) {
       date:      today,
       time:      d.time,
       total_min: d.totalMin,
-      status:    d.status,
+      status:    persistedStatus(d.status),
     })),
     { onConflict: 'id' },
   );
