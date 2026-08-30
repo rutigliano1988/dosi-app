@@ -51,6 +51,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // snooze: +10 min. Si cruza medianoche, snoozePatch también sube `date`.
-  await sb.from('doses').update(snoozePatch(dose, 10)).eq('id', doseId);
+  const { error } = await sb.from('doses').update(snoozePatch(dose, 10)).eq('id', doseId);
+  if (error) return json(req, { error: 'update-failed' }, 500);
   return json(req, { ok: true });
 });
