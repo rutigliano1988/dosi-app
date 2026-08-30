@@ -194,6 +194,12 @@ interface DoseInsert {
 /**
  * Filas `doses` que DEBERÍAN existir para los últimos `days` días (sin contar
  * hoy) y aún no están en `existing`. Pura y testeable — `backfillHistory` la usa.
+ *
+ * La ventana es `today-(days-1) … today-1`, idéntica a la de `pullHistory`
+ * menos hoy. Antes recorría `today-days … today-1`: el día `today-days` se
+ * generaba pero `pullHistory` nunca lo traía, así que jamás entraba en
+ * `existing` y `backfillHistory` devolvía > 0 en cada arranque para cualquier
+ * usuario con una medicina de más de 90 días.
  */
 export function backfillCandidates(
   uid: string,
@@ -203,7 +209,7 @@ export function backfillCandidates(
   now: Date,
 ): DoseInsert[] {
   const out: DoseInsert[] = [];
-  for (let i = days; i >= 1; i--) {
+  for (let i = days - 1; i >= 1; i--) {
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
     const dateStr = isoDate(day);
     for (const { medId, time, totalMin } of expectedDosesOn(meds, day)) {
@@ -218,16 +224,25 @@ export function backfillCandidates(
 /**
  * Al abrir la app: materializa las filas `doses` que faltan de los últimos
  * `days` días para que el historial y la adherencia sean estables. Nunca pisa
- * filas existentes (`ignoreDuplicates`). Devuelve cuántas insertó.
+ * filas existentes (`ignoreDuplicates`). Devuelve cuántas insertó de verdad.
+ *
+ * Invariante de seguridad entre ficheros: el backfill es inerte respecto a
+ * `send-reminders` SÓLO porque (a) nunca escribe `date = today` y (b)
+ * `_shared/reminders.ts` `caregiverMissDue` sale antes si `reminded_count < 1`,
+ * y las filas backfilleadas tienen `reminded_count = 0`. Si algún día se relaja
+ * esa guarda, hay que revisar este backfill.
  */
 export async function backfillHistory(uid: string, meds: Medicine[], days = 90): Promise<number> {
   if (!uid || meds.length === 0) return 0;
   const existing = new Set((await pullHistory(uid, days)).map((d) => d.id));
   const toInsert = backfillCandidates(uid, meds, days, existing, new Date());
   if (toInsert.length === 0) return 0;
-  const { error } = await supabase.from('doses').upsert(toInsert, { onConflict: 'id', ignoreDuplicates: true });
+  const { data, error } = await supabase
+    .from('doses')
+    .upsert(toInsert, { onConflict: 'id', ignoreDuplicates: true })
+    .select('id');
   if (error) { console.error('[dosi] backfillHistory error:', error.message); return 0; }
-  return toInsert.length;
+  return data?.length ?? 0;
 }
 
 // ─── Pull ─────────────────────────────────────────────────────────────────────
