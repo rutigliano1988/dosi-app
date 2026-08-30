@@ -9,6 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon-180.png'],
+      // Registra el service worker también en `npm run dev` — sin esto no hay
+      // push (ni botones de aviso, ni emparejamiento de cuidador) en local.
+      devOptions: { enabled: true },
       manifest: {
         name: 'Dosi · Tu compañero de medicinas',
         short_name: 'Dosi',

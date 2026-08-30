@@ -80,7 +80,14 @@ export async function cancelCaregiver(): Promise<void> {
 async function pushCreds(): Promise<{ endpoint: string; secret: string } | null> {
   if (!('serviceWorker' in navigator)) return null;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    // `serviceWorker.ready` no resuelve nunca si no hay SW registrado (p. ej.
+    // `npm run dev` sin PWA): con timeout devolvemos null → el llamador trata
+    // como "sin push" en vez de quedarse colgado.
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]);
+    if (!reg) return null;
     const sub = await reg.pushManager.getSubscription();
     if (!sub) return null;
     const { data } = await supabase
