@@ -32,7 +32,19 @@ export default defineConfig({
       workbox: {
         importScripts: ['push-sw.js'],
         globPatterns: ['**/*.{js,css,html,svg,png}'],
+        // El stack de jsPDF (~776 KiB, ~57% del precache) solo se usa al generar
+        // el PDF del médico. Se saca del precache y se cachea en runtime la
+        // primera vez que se usa de verdad.
+        globIgnores: ['**/pdf-*.js'],
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/pdf-[^/]+\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pdf-lib',
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
@@ -53,6 +65,19 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Nombre determinista para el chunk del PDF → workbox lo puede excluir
+        // del precache por patrón (`pdf-*.js`).
+        manualChunks(id: string) {
+          if (/node_modules\/(jspdf|html2canvas|canvg|dompurify|core-js|raf|rgbcolor)\//.test(id)) {
+            return 'pdf';
+          }
+        },
+      },
+    },
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
