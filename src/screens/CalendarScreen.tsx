@@ -257,7 +257,7 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
               } else if (da.missed + da.skipped === 0) {
                 dot = <div style={{ width: 9, height: 9, borderRadius: 5, background: theme.success }} />;
               } else {
-                dot = <ProgressRing theme={theme} value={da.taken / due} size={18} stroke={3} color={theme.success} />;
+                dot = <ProgressRing theme={theme} value={da.taken / due} size={18} stroke={3} color={theme.success} showLabel={false} />;
               }
               return (
                 <button key={i} onClick={() => setSelectedMonthDay(sel ? null : dISO)} style={{
