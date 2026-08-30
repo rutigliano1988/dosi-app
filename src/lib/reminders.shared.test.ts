@@ -109,4 +109,22 @@ describe('caregiverMissDue', () => {
     expect(caregiverMissDue({ ...base, status: 'taken' }, at(9, 30))).toBe(false);
     expect(caregiverMissDue({ ...base, status: 'skipped' }, at(9, 30))).toBe(false);
   });
+
+  it('toma tardía (23:30): la ventana cruza medianoche con daysAgo=1', () => {
+    const late = { ...base, time: '23:30' };
+    // mismo día, antes de medianoche: aún no toca (0..29 min)
+    expect(caregiverMissDue(late, at(23, 45), 0)).toBe(false);
+    // madrugada del día siguiente → daysAgo=1
+    expect(caregiverMissDue(late, at(0, 29), 1)).toBe(false); // 59 min
+    expect(caregiverMissDue(late, at(0, 30), 1)).toBe(true);  // 60 min
+    expect(caregiverMissDue(late, at(1, 29), 1)).toBe(true);  // 119 min
+    expect(caregiverMissDue(late, at(1, 30), 1)).toBe(false); // 120 min
+  });
+
+  it('toma de las 22:30: parte de la ventana ya cruza medianoche', () => {
+    const late = { ...base, time: '22:30' };
+    expect(caregiverMissDue(late, at(23, 45), 0)).toBe(true);  // 75 min, mismo día
+    expect(caregiverMissDue(late, at(0, 15), 1)).toBe(true);   // 105 min, día siguiente
+    expect(caregiverMissDue(late, at(0, 31), 1)).toBe(false);  // 121 min
+  });
 });

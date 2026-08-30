@@ -120,7 +120,18 @@ Deno.serve(async (req: Request) => {
     if (cg && cg.notify_on_miss !== false) {
       const cgSubs = byUser.get(cg.caregiver_user_id as string) ?? [];
       if (cgSubs.length > 0) {
-        for (const dose of dosesHoy ?? []) {
+        // Tomas de hoy + (solo de madrugada) las de ayer cuya ventana
+        // [+60, +120) min cruzó medianoche — p. ej. una toma de las 23:30.
+        const cgCandidates = (dosesHoy ?? []).map((d) => ({ dose: d, daysAgo: 0 }));
+        if (now.getHours() * 60 + now.getMinutes() < 120) {
+          const ayer = new Date(now);
+          ayer.setDate(ayer.getDate() - 1);
+          const { data: dosesAyer, error: ayerErr } = await sb
+            .from('doses').select('*').eq('user_id', userId).eq('date', isoDate(ayer));
+          if (ayerErr) console.error('[send-reminders] doses ayer', userId, ayerErr);
+          for (const d of dosesAyer ?? []) cgCandidates.push({ dose: d, daysAgo: 1 });
+        }
+        for (const { dose, daysAgo } of cgCandidates) {
           if (dose.status === 'taken' || dose.status === 'skipped') continue;
           if (dose.caregiver_alerted_at) continue;
           const dr = {
@@ -129,7 +140,7 @@ Deno.serve(async (req: Request) => {
             reminded_count: (dose.reminded_count ?? 0) as number,
             reminded_at: (dose.reminded_at ?? null) as string | null,
           };
-          if (!caregiverMissDue(dr, now)) continue;
+          if (!caregiverMissDue(dr, now, daysAgo)) continue;
           const med = meds.find((m) => m.id === dose.med_id);
           if (!med) continue;
           const payload = {
