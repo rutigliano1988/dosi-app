@@ -1,16 +1,18 @@
 import { useState, useMemo } from 'react';
+import type { JSX } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import { tArr } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
 import { isoDate } from '../lib/schedule';
+import { buildAdherence } from '../lib/adherence';
+import { I } from '../icons';
 import TopBar from '../components/TopBar';
 import Card from '../components/Card';
 import SectionList from '../components/SectionList';
 import ProgressRing from '../components/ProgressRing';
 import SegmentedRow from '../components/SegmentedRow';
-import Badge from '../components/Badge';
-import PillGlyph from '../components/PillGlyph';
+import DayTimeline from '../components/DayTimeline';
 
 interface Props {
   theme: Theme;
@@ -63,7 +65,6 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
 
   // Timeline for selected day
   const selectedDateStr = isoDate(week[selected]);
-  const selectedDoses = dosesForDate(selectedDateStr);
 
   const monthNames = lang === 'es'
     ? ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -76,6 +77,32 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
     if (isToday) return lang === 'es' ? `${num} ${mon} · hoy` : `${num} ${mon} · today`;
     return `${num} ${mon}`;
   }
+
+  // ─── Month view ───
+  const [monthOffset, setMonthOffset] = useState(0); // 0 = mes actual, hasta -3
+  const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
+
+  const monthView = useMemo(() => {
+    const base = new Date();
+    const first = new Date(base.getFullYear(), base.getMonth() + monthOffset, 1);
+    const year = first.getFullYear();
+    const month = first.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const lastDayISO = isoDate(new Date(Math.min(
+      new Date(year, month, daysInMonth).getTime(),
+      new Date().setHours(0, 0, 0, 0),
+    )));
+    const fromISO = isoDate(first);
+    const summary = buildAdherence(meds, historyDoses, fromISO, lastDayISO, new Date());
+    const perDay = new Map(summary.perDay.map(d => [d.date, d]));
+    // rejilla: hueco inicial = (isoWeekday(first) - 1), luego 1..daysInMonth
+    const lead = ((first.getDay() + 6) % 7);
+    const cells: (Date | null)[] = [
+      ...Array.from({ length: lead }, () => null),
+      ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+    ];
+    return { year, month, cells, perDay, summary, monthLabel: `${monthNames[month]} ${year}` };
+  }, [monthOffset, meds, historyDoses]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ paddingTop: 8, paddingBottom: 120 }}>
@@ -165,65 +192,106 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
 
           {/* Day timeline */}
           <SectionList theme={theme} title={dayLabel(week[selected])}>
-            {selectedDoses.length === 0 ? (
-              <div style={{
-                padding: '24px 16px', textAlign: 'center',
-                color: theme.textDim, fontSize: 14,
-              }}>
-                {lang === 'es' ? 'Sin dosis registradas' : 'No doses recorded'}
-              </div>
-            ) : (
-              selectedDoses.map((dose, i) => {
-                const med = meds.find(m => m.id === dose.medId);
-                if (!med) return null;
-                const stKind = dose.status === 'taken' ? 'success'
-                  : dose.status === 'skipped' ? 'danger'
-                  : dose.status === 'missed' ? 'danger'
-                  : 'neutral';
-                const stLabel = dose.status === 'taken' ? t('legendDone')
-                  : dose.status === 'skipped' ? (lang === 'es' ? 'Omitida' : 'Skipped')
-                  : dose.status === 'missed' ? (lang === 'es' ? 'Perdida' : 'Missed')
-                  : t('legendPending');
-                return (
-                  <div key={i} style={{
-                    background: theme.surface, borderRadius: 16,
-                    border: `1px solid ${theme.border}`,
-                    padding: '10px 14px',
-                    display: 'flex', alignItems: 'center', gap: 12,
-                  }}>
-                    <div style={{
-                      width: 50, fontSize: 13, fontWeight: 700,
-                      color: theme.text, fontVariantNumeric: 'tabular-nums',
-                    }}>
-                      {dose.time}
-                    </div>
-                    <PillGlyph color={med.color} size={36} form={med.form} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14.5, fontWeight: 600, color: theme.text }}>{med.name}</div>
-                      <div style={{ fontSize: 12.5, color: theme.textDim }}>{med.dose}</div>
-                    </div>
-                    <Badge theme={theme} kind={stKind as 'success' | 'neutral' | 'danger'}>
-                      {stLabel}
-                    </Badge>
-                  </div>
-                );
-              })
-            )}
+            <DayTimeline theme={theme} t={t} lang={lang} meds={meds}
+              doses={dosesForDate(selectedDateStr)}
+              emptyText={lang === 'es' ? 'Sin dosis registradas' : 'No doses recorded'} />
           </SectionList>
         </>
       ) : (
-        <div style={{
-          padding: '48px 24px', textAlign: 'center',
-          color: theme.textDim,
-        }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: theme.text, marginBottom: 6 }}>
-            {lang === 'es' ? 'Vista mensual próximamente' : 'Monthly view coming soon'}
+        <>
+          {/* Navegación de mes */}
+          <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button aria-label={t('monthPrev')} disabled={monthOffset <= -3}
+              onClick={() => { setMonthOffset(o => Math.max(-3, o - 1)); setSelectedMonthDay(null); }}
+              style={{
+                width: 38, height: 38, borderRadius: 12, background: theme.surface,
+                border: `1px solid ${theme.border}`, color: theme.text,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: monthOffset <= -3 ? 'default' : 'pointer',
+                opacity: monthOffset <= -3 ? 0.35 : 1,
+              }}>
+              {I.back(18, theme.text)}
+            </button>
+            <div style={{ fontWeight: 700, fontSize: 15, color: theme.text, textTransform: 'capitalize' }}>
+              {monthView.monthLabel}
+            </div>
+            <button aria-label={t('monthNext')} disabled={monthOffset >= 0}
+              onClick={() => { setMonthOffset(o => Math.min(0, o + 1)); setSelectedMonthDay(null); }}
+              style={{
+                width: 38, height: 38, borderRadius: 12, background: theme.surface,
+                border: `1px solid ${theme.border}`, color: theme.text,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: monthOffset >= 0 ? 'default' : 'pointer',
+                opacity: monthOffset >= 0 ? 0.35 : 1,
+              }}>
+              {I.chev(18, theme.text)}
+            </button>
           </div>
-          <div style={{ fontSize: 14 }}>
-            {lang === 'es' ? 'Por ahora usa la vista semanal' : 'Use the weekly view for now'}
+
+          {/* Cabecera de días L..D */}
+          <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
+            {tArr(lang, 'daysShort').map((d, i) => (
+              <div key={i} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: theme.textDim }}>{d}</div>
+            ))}
           </div>
-        </div>
+
+          {/* Rejilla */}
+          <div style={{ padding: '6px 16px 16px', display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
+            {monthView.cells.map((cell, i) => {
+              if (!cell) return <div key={i} />;
+              const dISO = isoDate(cell);
+              const isFuture = cell.setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0);
+              const da = monthView.perDay.get(dISO);
+              const due = da ? da.taken + da.missed + da.skipped : 0;
+              const sel = selectedMonthDay === dISO;
+              let dot: JSX.Element;
+              if (isFuture || !da || due === 0) {
+                dot = <div style={{ width: 7, height: 7, borderRadius: 4, background: theme.border }} />;
+              } else if (da.missed + da.skipped === 0) {
+                dot = <div style={{ width: 9, height: 9, borderRadius: 5, background: theme.success }} />;
+              } else {
+                dot = <ProgressRing theme={theme} value={da.taken / due} size={18} stroke={3} color={theme.success} />;
+              }
+              return (
+                <button key={i} onClick={() => setSelectedMonthDay(sel ? null : dISO)} style={{
+                  aspectRatio: '1', borderRadius: 12, border: 0, cursor: 'pointer', fontFamily: 'inherit',
+                  background: sel ? theme.accent : 'transparent',
+                  color: sel ? theme.accentText : theme.text,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{cell.getDate()}</span>
+                  {dot}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Resumen del mes visible */}
+          <div style={{ padding: '0 16px 16px' }}>
+            <Card theme={theme} style={{ padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <ProgressRing theme={theme} value={monthView.summary.rate ?? 0} size={64} color={theme.success} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 26, fontWeight: 700, color: theme.text, fontFamily: '"Instrument Serif", Georgia, serif' }}>
+                    {monthView.summary.rate === null ? '—' : Math.round(monthView.summary.rate * 100) + '%'}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: theme.textDim }}>
+                    {monthView.summary.skipped} {t('skippedCountLabel')} · {monthView.summary.missed} {t('missedCountLabel')} · {monthView.summary.taken + monthView.summary.missed} {t('dosesThisMonth')}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Timeline del día seleccionado */}
+          {selectedMonthDay && (
+            <SectionList theme={theme} title={selectedMonthDay}>
+              <DayTimeline theme={theme} t={t} lang={lang} meds={meds}
+                doses={dosesForDate(selectedMonthDay)}
+                emptyText={t('noDosesDay')} />
+            </SectionList>
+          )}
+        </>
       )}
     </div>
   );
