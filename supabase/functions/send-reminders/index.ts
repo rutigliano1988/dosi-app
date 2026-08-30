@@ -3,7 +3,7 @@
 // la zona horaria del usuario, envía avisos de toma y alertas de stock/caducidad.
 import { sbAdmin, webpushSend, type PushRow } from '../_shared/edge.ts';
 import { isoDate, nowInTz, buildTodayDoses, medState } from '../_shared/schedule.ts';
-import { dueReminder, stockAlertDecision, expiryAlertDecision, daysLeft, caregiverMissDue, deliveredAny } from '../_shared/reminders.ts';
+import { dueReminder, stockAlertDecision, expiryAlertDecision, daysLeft, caregiverMissDue, deliveredAny, sendSettled } from '../_shared/reminders.ts';
 import { rowToMed, type Medicine } from '../_shared/types.ts';
 
 Deno.serve(async (req: Request) => {
@@ -203,7 +203,7 @@ Deno.serve(async (req: Request) => {
             pushes++;
           }
         }
-        if (deliveredAny(statuses)) {
+        if (sendSettled(statuses)) {
           await sb.from('sent_alerts').upsert(
             { user_id: userId, med_id: med.id, kind: 'stock', sent_at: new Date().toISOString() },
             { onConflict: 'user_id,med_id,kind' },
@@ -238,7 +238,7 @@ Deno.serve(async (req: Request) => {
             pushes++;
           }
         }
-        if (deliveredAny(statuses)) {
+        if (sendSettled(statuses)) {
           await sb.from('sent_alerts').upsert(
             { user_id: userId, med_id: med.id, kind: 'expiry', sent_at: new Date().toISOString() },
             { onConflict: 'user_id,med_id,kind' },

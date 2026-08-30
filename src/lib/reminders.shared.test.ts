@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   dueReminder, daysLeft, stockAlertDecision, expiryAlertDecision, caregiverMissDue,
-  snoozePatch, deliveredAny,
+  snoozePatch, deliveredAny, sendSettled,
 } from '../../supabase/functions/_shared/reminders';
 import type { Medicine } from '../../supabase/functions/_shared/types';
 
@@ -156,5 +156,24 @@ describe('deliveredAny', () => {
     expect(deliveredAny([])).toBe(false);
     expect(deliveredAny([500, 502])).toBe(false);
     expect(deliveredAny([404, 410])).toBe(false);
+  });
+});
+
+describe('sendSettled', () => {
+  it('true si algo se entregó', () => {
+    expect(sendSettled([0])).toBe(true);
+    expect(sendSettled([500, 0])).toBe(true);
+    expect(sendSettled([404, 0])).toBe(true);
+  });
+  it('true si todos los fallos son 4xx definitivos', () => {
+    expect(sendSettled([404])).toBe(true);
+    expect(sendSettled([410, 403])).toBe(true);
+  });
+  it('false si algún fallo es transitorio (5xx) y nada se entregó', () => {
+    expect(sendSettled([500])).toBe(false);
+    expect(sendSettled([502, 404])).toBe(false);
+  });
+  it('false con lista vacía', () => {
+    expect(sendSettled([])).toBe(false);
   });
 });

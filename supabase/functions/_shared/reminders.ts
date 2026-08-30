@@ -84,3 +84,15 @@ export function snoozePatch(
 export function deliveredAny(statuses: number[]): boolean {
   return statuses.some((s) => s === 0);
 }
+
+/**
+ * true si el envío push se puede dar por terminado y NO merece reintento: algo se
+ * entregó (status 0), o todos los intentos fallaron con un error definitivo del lado
+ * de la suscripción (4xx). Un 5xx (incl. el 500 de "VAPID sin configurar") se trata
+ * como transitorio y se reintenta. `[]` → false (no hubo a quién enviar).
+ */
+export function sendSettled(statuses: number[]): boolean {
+  if (statuses.length === 0) return false;
+  if (statuses.some((s) => s === 0)) return true;
+  return statuses.every((s) => s >= 400 && s < 500);
+}
