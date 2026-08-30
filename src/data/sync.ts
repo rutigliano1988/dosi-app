@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { isoDate } from '../lib/schedule';
+import { isoDate, expectedDosesOn } from '../lib/schedule';
 import type { Medicine, Dose, FreqKind, DurationKind } from './types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ export async function pushDoses(doses: Dose[], userId: string) {
 
 // ─── History ─────────────────────────────────────────────────────────────────
 
-export async function pullHistory(userId: string, days = 7): Promise<import('./types').Dose[]> {
+export async function pullHistory(userId: string, days = 90): Promise<import('./types').Dose[]> {
   const dates: string[] = [];
   for (let i = 0; i < days; i++) {
     const d = new Date();
@@ -156,6 +156,55 @@ export async function pullHistory(userId: string, days = 7): Promise<import('./t
     status:   r.status,
     date:     r.date,
   }));
+}
+
+interface DoseInsert {
+  id: string;
+  user_id: string;
+  med_id: string;
+  date: string;
+  time: string;
+  total_min: number;
+  status: 'upcoming';
+}
+
+/**
+ * Filas `doses` que DEBERÍAN existir para los últimos `days` días (sin contar
+ * hoy) y aún no están en `existing`. Pura y testeable — `backfillHistory` la usa.
+ */
+export function backfillCandidates(
+  uid: string,
+  meds: Medicine[],
+  days: number,
+  existing: Set<string>,
+  now: Date,
+): DoseInsert[] {
+  const out: DoseInsert[] = [];
+  for (let i = days; i >= 1; i--) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const dateStr = isoDate(day);
+    for (const { medId, time, totalMin } of expectedDosesOn(meds, day)) {
+      const id = `${medId}-${dateStr}-${time}`;
+      if (existing.has(id)) continue;
+      out.push({ id, user_id: uid, med_id: medId, date: dateStr, time, total_min: totalMin, status: 'upcoming' });
+    }
+  }
+  return out;
+}
+
+/**
+ * Al abrir la app: materializa las filas `doses` que faltan de los últimos
+ * `days` días para que el historial y la adherencia sean estables. Nunca pisa
+ * filas existentes (`ignoreDuplicates`). Devuelve cuántas insertó.
+ */
+export async function backfillHistory(uid: string, meds: Medicine[], days = 90): Promise<number> {
+  if (!uid || meds.length === 0) return 0;
+  const existing = new Set((await pullHistory(uid, days)).map((d) => d.id));
+  const toInsert = backfillCandidates(uid, meds, days, existing, new Date());
+  if (toInsert.length === 0) return 0;
+  const { error } = await supabase.from('doses').upsert(toInsert, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) { console.error('[dosi] backfillHistory error:', error.message); return 0; }
+  return toInsert.length;
 }
 
 // ─── Pull ─────────────────────────────────────────────────────────────────────
