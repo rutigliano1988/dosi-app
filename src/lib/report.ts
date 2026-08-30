@@ -42,7 +42,7 @@ export function scheduleText(med: Medicine): string {
 
 export function reportFileName(userName: string, fromISO: string, toISO: string): string {
   const slug = userName
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // quita diacríticos
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita diacríticos
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'paciente';
   return `dosi-informe-${slug}-${fromISO}-${toISO}.pdf`;
 }
