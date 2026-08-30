@@ -115,7 +115,7 @@ export default function ReportScreen({ theme, t, lang, meds, historyDoses, userN
           <div style={{ fontSize: 13.5, color: theme.textDim }}>{t('reportNoIncidents')}</div>
         ) : data.incidents.slice(0, 40).map((inc, i) => (
           <div key={i} style={{ fontSize: 13, color: theme.text, padding: '3px 0' }}>
-            {inc.dateISO} {inc.time} · {inc.medName} · {inc.kind === 'missed' ? t('missedCountLabel') : t('skippedCountLabel')}
+            {inc.dateISO} {inc.time} · {inc.medName} · {inc.kind === 'missed' ? t('incidentMissed') : t('incidentSkipped')}
           </div>
         ))}
       </Card>
@@ -154,17 +154,77 @@ function renderPdf(
     line(t('reportNoData'), 11, 20);
   } else {
     doc.setFont('helvetica', 'bold'); line(t('reportMedTableHeading'), 12, 16);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text([t('reportColMed'), t('reportColSchedule'), t('reportColTaken'), t('reportColMissed'), t('reportColSkipped'), t('reportColRate')].join('   |   '), M, y);
-    y += 14;
+
+    // ── Tabla por medicina, dibujada a mano con primitivas de jsPDF ──
+    // Offsets de columna fijos sobre el ancho útil (M .. M+TABLE_W).
+    const TABLE_W = 499;
+    type Col = { x: number; w: number; align: 'left' | 'right'; head: string };
+    const cols: Col[] = [
+      { x: M,       w: 150, align: 'left',  head: t('reportColMed') },
+      { x: M + 150, w: 145, align: 'left',  head: t('reportColSchedule') },
+      { x: M + 295, w: 45,  align: 'right', head: t('reportColTaken') },
+      { x: M + 345, w: 45,  align: 'right', head: t('reportColMissed') },
+      { x: M + 395, w: 50,  align: 'right', head: t('reportColSkipped') },
+      { x: M + 450, w: 49,  align: 'right', head: t('reportColRate') },
+    ];
+    const ROW_H = 15;
+    const PAGE_LIMIT = 760;
+    const CELL_FONT = 9.5;
+
+    // Recorta un texto para que quepa en cellW (a la fuente actual), con elipsis.
+    const clip = (txt: string, cellW: number): string => {
+      if (doc.getTextWidth(txt) <= cellW) return txt;
+      let s = txt;
+      while (s.length > 1 && doc.getTextWidth(s + '…') > cellW) s = s.slice(0, -1);
+      return s + '…';
+    };
+
+    const drawHeaderRow = () => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(CELL_FONT);
+      for (const c of cols) {
+        const tx = c.align === 'right' ? c.x + c.w : c.x;
+        doc.text(c.head, tx, y, { align: c.align });
+      }
+      y += 5;
+      doc.setLineWidth(0.5);
+      doc.line(M, y, M + TABLE_W, y);
+      y += ROW_H - 4;
+      doc.setFont('helvetica', 'normal');
+    };
+
+    drawHeaderRow();
+
     for (const ml of data.medLines) {
+      if (y > PAGE_LIMIT) {
+        doc.addPage();
+        y = 64;
+        drawHeaderRow();
+      }
       const rate = ml.rate === null ? '—' : Math.round(ml.rate * 100) + '%';
-      doc.text(`${ml.name}  |  ${ml.scheduleText}  |  ${ml.taken}  |  ${ml.missed}  |  ${ml.skipped}  |  ${rate}`, M, y);
-      y += 13;
-      if (y > 760) { doc.addPage(); y = 64; }
+      const cells = [
+        clip(ml.name, cols[0].w - 4),
+        clip(ml.scheduleText, cols[1].w - 4),
+        String(ml.taken),
+        String(ml.missed),
+        String(ml.skipped),
+        rate,
+      ];
+      doc.setFontSize(CELL_FONT);
+      cells.forEach((val, i) => {
+        const c = cols[i];
+        const tx = c.align === 'right' ? c.x + c.w : c.x;
+        doc.text(val, tx, y, { align: c.align });
+      });
+      y += 4;
+      doc.setLineWidth(0.2);
+      doc.setDrawColor(210);
+      doc.line(M, y, M + TABLE_W, y);
+      doc.setDrawColor(0);
+      y += ROW_H - 4;
     }
     y += 10;
+    doc.setFontSize(11);
   }
 
   doc.setFont('helvetica', 'bold'); line(t('reportIncidentsHeading'), 12, 16);
@@ -173,7 +233,7 @@ function renderPdf(
     line(t('reportNoIncidents'), 10, 16);
   } else {
     for (const inc of data.incidents) {
-      const kind = inc.kind === 'missed' ? t('missedCountLabel') : t('skippedCountLabel');
+      const kind = inc.kind === 'missed' ? t('incidentMissed') : t('incidentSkipped');
       doc.text(`${inc.dateISO} ${inc.time} · ${inc.medName} · ${kind}`, M, y);
       y += 12;
       if (y > 780) { doc.addPage(); y = 64; }
