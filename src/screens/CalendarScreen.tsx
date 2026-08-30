@@ -84,6 +84,8 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
 
   const monthView = useMemo(() => {
     const base = new Date();
+    // Suelo de la ventana de datos: historyDoses sólo cubre 90 días.
+    const windowStartISO = isoDate(new Date(base.getFullYear(), base.getMonth(), base.getDate() - 89));
     const first = new Date(base.getFullYear(), base.getMonth() + monthOffset, 1);
     const year = first.getFullYear();
     const month = first.getMonth();
@@ -92,17 +94,22 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
       new Date(year, month, daysInMonth).getTime(),
       new Date().setHours(0, 0, 0, 0),
     )));
-    const fromISO = isoDate(first);
+    // Recortar el rango a la ventana de datos: los días previos no reciben
+    // entrada en perDay → caen en la rama gris (!da), sin "missed" falsos.
+    const fromISO = isoDate(first) > windowStartISO ? isoDate(first) : windowStartISO;
     const summary = buildAdherence(meds, historyDoses, fromISO, lastDayISO, new Date());
     const perDay = new Map(summary.perDay.map(d => [d.date, d]));
+    // ¿Se puede retroceder un mes más sin caer en un mes entero sin datos?
+    const prevMonthLast = new Date(base.getFullYear(), base.getMonth() + monthOffset, 0);
+    const canGoBack = isoDate(prevMonthLast) >= windowStartISO;
     // rejilla: hueco inicial = (isoWeekday(first) - 1), luego 1..daysInMonth
     const lead = ((first.getDay() + 6) % 7);
     const cells: (Date | null)[] = [
       ...Array.from({ length: lead }, () => null),
       ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
     ];
-    return { year, month, cells, perDay, summary, monthLabel: `${monthNames[month]} ${year}` };
-  }, [monthOffset, meds, historyDoses]); // eslint-disable-line react-hooks/exhaustive-deps
+    return { year, month, cells, perDay, summary, canGoBack, monthLabel: `${monthNames[month]} ${year}` };
+  }, [monthOffset, meds, historyDoses, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ paddingTop: 8, paddingBottom: 120 }}>
@@ -201,14 +208,14 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
         <>
           {/* Navegación de mes */}
           <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button aria-label={t('monthPrev')} disabled={monthOffset <= -3}
-              onClick={() => { setMonthOffset(o => Math.max(-3, o - 1)); setSelectedMonthDay(null); }}
+            <button aria-label={t('monthPrev')} disabled={!monthView.canGoBack}
+              onClick={() => { if (monthView.canGoBack) { setMonthOffset(o => o - 1); setSelectedMonthDay(null); } }}
               style={{
                 width: 38, height: 38, borderRadius: 12, background: theme.surface,
                 border: `1px solid ${theme.border}`, color: theme.text,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: monthOffset <= -3 ? 'default' : 'pointer',
-                opacity: monthOffset <= -3 ? 0.35 : 1,
+                cursor: monthView.canGoBack ? 'pointer' : 'default',
+                opacity: monthView.canGoBack ? 1 : 0.35,
               }}>
               {I.back(18, theme.text)}
             </button>
@@ -240,7 +247,7 @@ export default function CalendarScreen({ theme, t, lang, meds, doses, historyDos
             {monthView.cells.map((cell, i) => {
               if (!cell) return <div key={i} />;
               const dISO = isoDate(cell);
-              const isFuture = cell.setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0);
+              const isFuture = dISO > todayStr;
               const da = monthView.perDay.get(dISO);
               const due = da ? da.taken + da.missed + da.skipped : 0;
               const sel = selectedMonthDay === dISO;
