@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isoDate, daysBetween, isoWeekday, medState, expandTimes, isActiveOn, treatmentDay,
-  buildTodayDoses, shiftTime,
+  buildTodayDoses, shiftTime, expectedDosesOn,
 } from './schedule';
 import type { Medicine } from '../data/types';
 
@@ -190,5 +190,72 @@ describe('shiftTime', () => {
   it('suma minutos con wrap de 24h', () => {
     expect(shiftTime('08:00', 10)).toBe('08:10');
     expect(shiftTime('23:55', 10)).toBe('00:05');
+  });
+});
+
+describe('expectedDosesOn', () => {
+  it('daily: todas las horas expandidas, ordenadas', () => {
+    const m = med({ id: 'a', schedule: { freq: 'daily', times: ['20:00', '08:00'] } });
+    expect(expectedDosesOn([m], new Date(2026, 7, 28))).toEqual([
+      { medId: 'a', time: '08:00', totalMin: 480 },
+      { medId: 'a', time: '20:00', totalMin: 1200 },
+    ]);
+  });
+
+  it('weekdays: vacío si el día no está en la lista', () => {
+    const m = med({ schedule: { freq: 'weekdays', times: ['09:00'], weekdays: [1, 3, 5] } });
+    expect(expectedDosesOn([m], new Date(2026, 8, 1))).toEqual([]);  // martes
+    expect(expectedDosesOn([m], new Date(2026, 7, 31)).length).toBe(1); // lunes
+  });
+
+  it('interval: hereda la expansión de expandTimes', () => {
+    const m = med({ id: 'x', schedule: { freq: 'interval', times: ['08:00'], intervalHours: 8 } });
+    expect(expectedDosesOn([m], new Date(2026, 7, 28)).map(d => d.time))
+      .toEqual(['00:00', '08:00', '16:00']);
+  });
+
+  it('excluye una medicina cuyo tratamiento aún no ha empezado', () => {
+    const m = med({ duration: { kind: 'ongoing', startedOn: '2026-09-01' } });
+    expect(expectedDosesOn([m], new Date(2026, 7, 28))).toEqual([]);
+    expect(expectedDosesOn([m], new Date(2026, 8, 1)).length).toBe(1);
+  });
+
+  it('excluye una medicina finalizada (duración en días)', () => {
+    const m = med({ schedule: { freq: 'daily', times: ['08:00'] },
+      duration: { kind: 'days', days: 3, startedOn: '2026-08-20' } });
+    expect(expectedDosesOn([m], new Date(2026, 7, 25))).toEqual([]); // día 5 > 3
+    expect(expectedDosesOn([m], new Date(2026, 7, 21)).length).toBe(1); // día 1
+  });
+
+  it('excluye una medicina pausada', () => {
+    const m = med({ paused: true });
+    expect(expectedDosesOn([m], new Date(2026, 7, 28))).toEqual([]);
+  });
+
+  it('varias medicinas: mezcla ordenada por hora', () => {
+    const a = med({ id: 'a', schedule: { freq: 'daily', times: ['12:00'] } });
+    const b = med({ id: 'b', schedule: { freq: 'daily', times: ['08:00'] } });
+    expect(expectedDosesOn([a, b], new Date(2026, 7, 28)).map(d => `${d.medId}@${d.time}`))
+      .toEqual(['b@08:00', 'a@12:00']);
+  });
+});
+
+describe('buildTodayDoses tras el refactor (regresión)', () => {
+  it('produce exactamente lo mismo que antes para el vector estándar', () => {
+    const meds = [
+      med({ id: 'a', schedule: { freq: 'daily', times: ['20:00', '08:00'] } }),
+      med({ id: 'b', schedule: { freq: 'daily', times: ['12:00'] } }),
+    ];
+    const now = new Date(2026, 7, 28, 12, 15);
+    expect(buildTodayDoses(meds, now)).toEqual([
+      { id: 'a-2026-08-28-08:00', medId: 'a', time: '08:00', totalMin: 480, status: 'missed' },
+      { id: 'b-2026-08-28-12:00', medId: 'b', time: '12:00', totalMin: 720, status: 'now' },
+      { id: 'a-2026-08-28-20:00', medId: 'a', time: '20:00', totalMin: 1200, status: 'upcoming' },
+    ]);
+  });
+
+  it('no genera dosis de una medicina no iniciada', () => {
+    const m = med({ id: 'z', duration: { kind: 'ongoing', startedOn: '2026-09-01' } });
+    expect(buildTodayDoses([m], new Date(2026, 7, 28, 9, 0))).toEqual([]);
   });
 });

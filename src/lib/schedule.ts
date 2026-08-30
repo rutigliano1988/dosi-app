@@ -87,24 +87,43 @@ export function treatmentDay(med: Medicine, today: Date): { current: number; tot
   return { current, total: dur.days };
 }
 
+// ─── Horario esperado de un día cualquiera ───────────────────────────────────
+
+/**
+ * Las tomas que TOCABAN el día `date` según la definición actual de cada
+ * medicina. Sin estado temporal (eso es cosa de buildTodayDoses). Excluye
+ * medicinas cuyo tratamiento aún no había empezado en esa fecha.
+ */
+export function expectedDosesOn(
+  meds: Medicine[],
+  date: Date,
+): { medId: string; time: string; totalMin: number }[] {
+  const out: { medId: string; time: string; totalMin: number }[] = [];
+  for (const m of meds) {
+    if (daysBetween(m.duration.startedOn, date) < 0) continue; // aún no empezado
+    if (!isActiveOn(m, date)) continue;
+    for (const t of expandTimes(m)) {
+      const totalMin = strToMin(t);
+      if (Number.isNaN(totalMin)) continue;
+      out.push({ medId: m.id, time: t, totalMin });
+    }
+  }
+  // sort estable → mismo totalMin conserva orden de `meds` y de expandTimes
+  return out.sort((a, b) => a.totalMin - b.totalMin);
+}
+
 // ─── Dosis de hoy ────────────────────────────────────────────────────────────
 
 export function buildTodayDoses(meds: Medicine[], now: Date): Dose[] {
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const doses: Dose[] = [];
-  for (const m of meds) {
-    if (!isActiveOn(m, now)) continue;
-    for (const t of expandTimes(m)) {
-      const totalMin = strToMin(t);
-      if (Number.isNaN(totalMin)) continue;
-      const status: Dose['status'] =
-        totalMin < nowMin - 30 ? 'missed'
-        : totalMin < nowMin + 30 ? 'now'
-        : 'upcoming';
-      doses.push({ id: `${m.id}-${isoDate(now)}-${t}`, medId: m.id, time: t, totalMin, status });
-    }
-  }
-  return doses.sort((a, b) => a.totalMin - b.totalMin);
+  const today = isoDate(now);
+  return expectedDosesOn(meds, now).map(({ medId, time, totalMin }) => {
+    const status: Dose['status'] =
+      totalMin < nowMin - 30 ? 'missed'
+      : totalMin < nowMin + 30 ? 'now'
+      : 'upcoming';
+    return { id: `${medId}-${today}-${time}`, medId, time, totalMin, status };
+  });
 }
 
 export function shiftTime(time: string, mins: number): string {
