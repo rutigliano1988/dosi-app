@@ -17,6 +17,7 @@ export interface FormData {
   times: string[];
   weekdays: number[];
   intervalHours: 6 | 8 | 12;
+  intervalDays: number;
   duration: DurationKind;
   days: number;
   until: string;
@@ -207,9 +208,10 @@ function StepSchedule({ theme, t, data, upd }: { theme: Theme; t: Props['t']; da
     <div style={{ padding: '20px 24px 0' }}>
       <Field theme={theme} label={t('frequency')}>
         <SegmentedRow theme={theme} value={data.freq} onChange={v => upd('freq', v)} options={[
-          { id: 'daily',    label: t('freqDaily') },
-          { id: 'weekdays', label: t('freqWeekdays') },
-          { id: 'interval', label: t('freqInterval') },
+          { id: 'daily',      label: t('freqDaily') },
+          { id: 'weekdays',   label: t('freqWeekdays') },
+          { id: 'interval',   label: t('freqInterval') },
+          { id: 'everyNDays', label: t('freqEveryNDays') },
         ]} />
       </Field>
 
@@ -231,6 +233,13 @@ function StepSchedule({ theme, t, data, upd }: { theme: Theme; t: Props['t']; da
               );
             })}
           </div>
+        </Field>
+      )}
+
+      {data.freq === 'everyNDays' && (
+        <Field theme={theme} label={t('everyNDaysLabel')}>
+          <Stepper theme={theme} value={data.intervalDays} min={2}
+            onChange={v => upd('intervalDays', v)} />
         </Field>
       )}
 
@@ -374,6 +383,7 @@ export default function AddMedScreen({ theme, t, mode = 'add', initialData, onCa
     times:         initialData?.schedule?.times ?? ['08:00'],
     weekdays:      initialData?.schedule?.weekdays ?? [1, 2, 3, 4, 5],
     intervalHours: initialData?.schedule?.intervalHours ?? 8,
+    intervalDays:  initialData?.schedule?.intervalDays ?? 10,
     duration:      initialData?.duration?.kind ?? 'ongoing',
     days:          initialData?.duration?.days ?? 7,
     until:         initialData?.duration?.until ?? '',

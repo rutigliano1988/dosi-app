@@ -388,6 +388,8 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
               ? { freq: 'interval', times: [d.times[0] ?? '08:00'], intervalHours: d.intervalHours }
               : d.freq === 'weekdays'
               ? { freq: 'weekdays', times: cleanTimes, weekdays: d.weekdays }
+              : d.freq === 'everyNDays'
+              ? { freq: 'everyNDays', times: cleanTimes, intervalDays: d.intervalDays }
               : { freq: 'daily', times: cleanTimes };
           const buildDuration = (startedOn: string): Medicine['duration'] =>
             d.duration === 'days'
