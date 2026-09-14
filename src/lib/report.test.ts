@@ -22,6 +22,10 @@ describe('scheduleText', () => {
     expect(scheduleText(med({ schedule: { freq: 'weekdays', times: ['09:00'], weekdays: [1, 3, 5] } })))
       .toBe('L, X, V · 09:00');
   });
+  it('everyNDays → prefijo de cadencia', () => {
+    expect(scheduleText(med({ schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 } })))
+      .toBe('cada 10 días · 09:00');
+  });
 });
 
 describe('reportFileName', () => {

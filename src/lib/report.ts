@@ -37,6 +37,10 @@ export function scheduleText(med: Medicine): string {
     const days = [...med.schedule.weekdays].sort((a, b) => a - b).map((d) => WD[d - 1]).join(', ');
     return `${days} · ${times}`;
   }
+  if (med.schedule.freq === 'everyNDays') {
+    const n = med.schedule.intervalDays ?? 1;
+    return `cada ${n} días · ${times}`;
+  }
   return times;
 }
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine } from '../data/types';
-import { expandTimes, medState } from '../lib/schedule';
+import { expandTimes, medState, cadenceSpanDays } from '../lib/schedule';
 import { I } from '../icons';
 import TopBar from '../components/TopBar';
 import IconBtn from '../components/IconBtn';
@@ -31,7 +31,7 @@ function InventoryRow({ theme, t, med, onOpen, warn, finished }: {
   finished?: boolean;
 }) {
   const dosesPerDay = expandTimes(med).length;
-  const daysLeft = Math.floor(med.stock / dosesPerDay);
+  const daysLeft = Math.floor(med.stock / Math.max(1, dosesPerDay) * cadenceSpanDays(med));
   const expSoon = med.expiry
     ? (new Date(med.expiry).getTime() - Date.now() < 90 * 24 * 60 * 60 * 1000)
     : false;

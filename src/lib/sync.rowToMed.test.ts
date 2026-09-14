@@ -43,7 +43,7 @@ describe('rowToMed: paridad sync.ts ↔ _shared/types.ts', () => {
     expect(m.name).toBe('');
     expect(m.form).toBe('pill');
     expect(m.color).toBe('coral');
-    expect(m.schedule).toEqual({ freq: 'daily', times: ['08:00'], weekdays: undefined, intervalHours: undefined });
+    expect(m.schedule).toEqual({ freq: 'daily', times: ['08:00'], weekdays: undefined, intervalHours: undefined, intervalDays: undefined });
     expect(m.duration.kind).toBe('ongoing');
     expect(m.duration.startedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(m.stock).toBe(0);

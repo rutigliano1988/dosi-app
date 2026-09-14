@@ -1,5 +1,5 @@
 import type { Medicine } from './types.ts';
-import { expandTimes, strToMin, daysBetween, isoDate, shiftTime } from './schedule.ts';
+import { expandTimes, strToMin, daysBetween, isoDate, shiftTime, cadenceSpanDays } from './schedule.ts';
 
 export interface DoseRow {
   time: string;
@@ -40,7 +40,7 @@ export function caregiverMissDue(dose: DoseRow, now: Date, daysAgo = 0): boolean
 
 /** Días de tratamiento que cubre el stock actual. */
 export function daysLeft(med: Medicine): number {
-  return Math.floor(med.stock / Math.max(1, expandTimes(med).length));
+  return Math.floor(med.stock / Math.max(1, expandTimes(med).length) * cadenceSpanDays(med));
 }
 
 export type AlertDecision = 'send' | 'clear' | 'none';

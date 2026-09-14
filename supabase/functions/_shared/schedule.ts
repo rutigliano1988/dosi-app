@@ -83,6 +83,18 @@ export function isActiveOn(med: Medicine, day: Date): boolean {
   return true;
 }
 
+/** Días de calendario entre dos días de toma consecutivos de esta cadencia (para prorratear el stock). */
+export function cadenceSpanDays(med: Medicine): number {
+  if (med.schedule.freq === 'everyNDays') {
+    return Math.max(1, med.schedule.intervalDays ?? 1);
+  }
+  if (med.schedule.freq === 'weekdays') {
+    const n = (med.schedule.weekdays ?? []).length;
+    return n > 0 ? 7 / n : 1;
+  }
+  return 1;
+}
+
 // ─── Día de tratamiento (solo duración 'days') ───────────────────────────────
 
 export function treatmentDay(med: Medicine, today: Date): { current: number; total: number } | null {

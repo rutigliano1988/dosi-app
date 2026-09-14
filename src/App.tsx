@@ -210,7 +210,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   // Rebuild today's doses whenever any schedule-relevant field changes
   // (pause/resume, freq, weekdays, times, duration) — not just the med count.
   const schedSig = meds
-    .map(m => `${m.id}|${m.paused ? 1 : 0}|${m.schedule.freq}|${(m.schedule.weekdays ?? []).join(',')}|${expandTimes(m).join(',')}|${m.duration.kind}:${m.duration.days ?? ''}:${m.duration.until ?? ''}:${m.duration.startedOn}`)
+    .map(m => `${m.id}|${m.paused ? 1 : 0}|${m.schedule.freq}|${(m.schedule.weekdays ?? []).join(',')}|${m.schedule.intervalDays ?? ''}|${expandTimes(m).join(',')}|${m.duration.kind}:${m.duration.days ?? ''}:${m.duration.until ?? ''}:${m.duration.startedOn}`)
     .join(';');
   const prevSchedSig = useRef(schedSig);
   useEffect(() => {

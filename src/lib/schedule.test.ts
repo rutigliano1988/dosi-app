@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isoDate, daysBetween, isoWeekday, medState, expandTimes, isActiveOn, treatmentDay,
-  buildTodayDoses, shiftTime, expectedDosesOn,
+  buildTodayDoses, shiftTime, expectedDosesOn, cadenceSpanDays,
 } from './schedule';
 import type { Medicine } from '../data/types';
 
@@ -132,6 +132,21 @@ describe('isActiveOn', () => {
     });
     expect(isActiveOn(m, new Date(2026, 7, 1))).toBe(true);
     expect(isActiveOn(m, new Date(2026, 7, 2))).toBe(true);
+  });
+});
+
+describe('cadenceSpanDays', () => {
+  it('everyNDays devuelve el intervalo configurado', () => {
+    const m = med({ schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 } });
+    expect(cadenceSpanDays(m)).toBe(10);
+  });
+  it('weekdays devuelve 7 / cantidad de días marcados', () => {
+    const m = med({ schedule: { freq: 'weekdays', times: ['09:00'], weekdays: [1, 3, 5] } });
+    expect(cadenceSpanDays(m)).toBe(7 / 3);
+  });
+  it('daily / interval devuelven 1', () => {
+    expect(cadenceSpanDays(med({ schedule: { freq: 'daily', times: ['08:00'] } }))).toBe(1);
+    expect(cadenceSpanDays(med({ schedule: { freq: 'interval', times: ['08:00'], intervalHours: 8 } }))).toBe(1);
   });
 });
 
