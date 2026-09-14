@@ -1,6 +1,7 @@
 import type { Theme } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine } from '../data/types';
+import { expandTimes, cadenceSpanDays } from '../lib/schedule';
 import { I } from '../icons';
 import Btn from '../components/Btn';
 
@@ -15,8 +16,8 @@ interface Props {
 }
 
 export default function StockAlertSheet({ theme, t, lang, med, onClose, onRefill, onRemind }: Props) {
-  const dosesPerDay = med.schedule.times.length;
-  const daysLeft = Math.floor(med.stock / dosesPerDay);
+  const dosesPerDay = expandTimes(med).length;
+  const daysLeft = Math.floor(med.stock / Math.max(1, dosesPerDay) * cadenceSpanDays(med));
 
   return (
     <div

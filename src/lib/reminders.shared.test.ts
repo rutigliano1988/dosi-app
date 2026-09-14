@@ -56,6 +56,12 @@ describe('daysLeft', () => {
     expect(daysLeft(med({ stock: 30, schedule: { freq: 'daily', times: ['08:00', '20:00'] } }))).toBe(15);
     expect(daysLeft(med({ stock: 10, schedule: { freq: 'interval', times: ['06:00'], intervalHours: 8 } }))).toBe(3);
   });
+
+  it('prorratea por la cadencia en everyNDays (no asume toma diaria)', () => {
+    const inyeccion = med({ stock: 3, schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 } });
+    expect(daysLeft(inyeccion)).toBe(30);
+    expect(stockAlertDecision(inyeccion, false)).toBe('none');
+  });
 });
 
 describe('stockAlertDecision', () => {

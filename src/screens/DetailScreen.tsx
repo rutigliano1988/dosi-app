@@ -2,7 +2,7 @@ import type { Theme, PillColorKey } from '../theme/tokens';
 import type { Lang } from '../i18n/strings';
 import type { Medicine, Dose } from '../data/types';
 import { PILL_COLORS } from '../theme/tokens';
-import { expandTimes, isoDate, medState, treatmentDay } from '../lib/schedule';
+import { expandTimes, isoDate, medState, treatmentDay, cadenceSpanDays } from '../lib/schedule';
 import { buildAdherence, adherenceLabel } from '../lib/adherence';
 import { I } from '../icons';
 import Card from '../components/Card';
@@ -53,7 +53,7 @@ export default function DetailScreen({ theme, t, lang, med, historyDoses, onBack
   const dayProgress = treatDay ? treatDay.current / treatDay.total : 1;
   const stockLow = med.stock <= 6;
   const dosesPerDay = expandTimes(med).length;
-  const daysLeft = Math.floor(med.stock / dosesPerDay);
+  const daysLeft = Math.floor(med.stock / Math.max(1, dosesPerDay) * cadenceSpanDays(med));
   const formKey = `form${med.form.charAt(0).toUpperCase()}${med.form.slice(1)}` as string;
 
   const isoToday = isoDate(now);

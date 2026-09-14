@@ -486,7 +486,7 @@ EOF
 ## Checklist E2E para el usuario (tras la revisión, antes del merge)
 
 1. **Añadir una medicina "cada 10 días"** (p. ej. una inyección) con hora de hoy. Confirmar que sale en "Hoy".
-2. **Calendario → Mes:** solo los días 1, 11, 21… (desde el inicio) muestran la dosis; los intermedios, no.
+2. **Calendario → Mes:** el Mes solo pinta puntos de adherencia ya registrada (días pasados/hoy), nunca el horario futuro — así que esto solo se ve retroactivamente, según pasen los días 1, 11, 21… No es un fallo si los días futuros salen en gris neutro.
 3. **Marcar la toma como tomada** el día que toca; confirmar que el detalle de la medicina (30 días) la cuenta.
 4. **Editar** la medicina y cambiar el número de días — se actualiza el patrón.
 5. **Medicinas existentes** (diaria, días de la semana, intervalo de horas) — sin regresión al usarlas o editarlas.

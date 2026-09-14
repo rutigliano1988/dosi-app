@@ -2,15 +2,16 @@ import type { PillColorKey } from '../theme/tokens';
 
 export type MedForm = 'capsule' | 'pill' | 'syrup' | 'injection' | 'drops';
 export type DoseStatus = 'upcoming' | 'now' | 'taken' | 'skipped' | 'missed';
-export type FreqKind = 'daily' | 'weekdays' | 'interval';
+export type FreqKind = 'daily' | 'weekdays' | 'interval' | 'everyNDays';
 export type DurationKind = 'ongoing' | 'days' | 'until';
 
 export interface MedSchedule {
   freq: FreqKind;
-  times: string[];               // 'daily'/'weekdays': tomas explícitas ordenadas
+  times: string[];               // 'daily'/'weekdays'/'everyNDays': tomas explícitas ordenadas
                                  // 'interval': un solo elemento = hora de la 1ª toma
   weekdays?: number[];           // 'weekdays': 1=lunes … 7=domingo
   intervalHours?: 6 | 8 | 12;    // 'interval'
+  intervalDays?: number;         // 'everyNDays': cada cuántos días. Ancla: duration.startedOn.
 }
 
 export interface MedDuration {

@@ -11,6 +11,12 @@ const cases: Record<string, unknown>[] = [
   },
   { id: 'm2' }, // fila mínima → defaults
   { id: 'm3', paused: 'yes' }, // paused no-booleano → false
+  {
+    id: 'm4', name: 'Insulina', dose: '1 dosis', form: 'injection', color: 'sky',
+    schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+    duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    stock: 5,
+  },
 ];
 
 describe('rowToMed: paridad sync.ts ↔ _shared/types.ts', () => {
@@ -23,12 +29,21 @@ describe('rowToMed: paridad sync.ts ↔ _shared/types.ts', () => {
     });
   }
 
+  it('everyNDays: intervalDays sobrevive la normalización en ambos lados', () => {
+    const row = {
+      id: 'm5', schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    };
+    expect(browserRowToMed(row).schedule.intervalDays).toBe(10);
+    expect(sharedRowToMed(row).schedule.intervalDays).toBe(10);
+  });
+
   it('fila mínima: defaults esperados', () => {
     const m = browserRowToMed({ id: 'x' });
     expect(m.name).toBe('');
     expect(m.form).toBe('pill');
     expect(m.color).toBe('coral');
-    expect(m.schedule).toEqual({ freq: 'daily', times: ['08:00'], weekdays: undefined, intervalHours: undefined });
+    expect(m.schedule).toEqual({ freq: 'daily', times: ['08:00'], weekdays: undefined, intervalHours: undefined, intervalDays: undefined });
     expect(m.duration.kind).toBe('ongoing');
     expect(m.duration.startedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(m.stock).toBe(0);

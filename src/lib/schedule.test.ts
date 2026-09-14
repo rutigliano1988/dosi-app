@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isoDate, daysBetween, isoWeekday, medState, expandTimes, isActiveOn, treatmentDay,
-  buildTodayDoses, shiftTime, expectedDosesOn,
+  buildTodayDoses, shiftTime, expectedDosesOn, cadenceSpanDays,
 } from './schedule';
 import type { Medicine } from '../data/types';
 
@@ -99,6 +99,54 @@ describe('isActiveOn', () => {
   });
   it('paused nunca activo', () => {
     expect(isActiveOn(med({ paused: true }), lunes)).toBe(false);
+  });
+  it('everyNDays: activo el día de inicio y cada N días después', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    });
+    expect(isActiveOn(m, new Date(2026, 7, 1))).toBe(true);   // día 0
+    expect(isActiveOn(m, new Date(2026, 7, 11))).toBe(true);  // día 10
+    expect(isActiveOn(m, new Date(2026, 7, 21))).toBe(true);  // día 20
+  });
+  it('everyNDays: inactivo los días intermedios', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    });
+    expect(isActiveOn(m, new Date(2026, 7, 5))).toBe(false);
+    expect(isActiveOn(m, new Date(2026, 7, 10))).toBe(false);
+    expect(isActiveOn(m, new Date(2026, 7, 12))).toBe(false);
+  });
+  it('everyNDays: inactivo antes del inicio del tratamiento', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-15' },
+    });
+    expect(isActiveOn(m, new Date(2026, 7, 5))).toBe(false);
+  });
+  it('everyNDays: intervalDays ausente no revienta (por defecto 1, activo cada día)', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'] },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    });
+    expect(isActiveOn(m, new Date(2026, 7, 1))).toBe(true);
+    expect(isActiveOn(m, new Date(2026, 7, 2))).toBe(true);
+  });
+});
+
+describe('cadenceSpanDays', () => {
+  it('everyNDays devuelve el intervalo configurado', () => {
+    const m = med({ schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 } });
+    expect(cadenceSpanDays(m)).toBe(10);
+  });
+  it('weekdays devuelve 7 / cantidad de días marcados', () => {
+    const m = med({ schedule: { freq: 'weekdays', times: ['09:00'], weekdays: [1, 3, 5] } });
+    expect(cadenceSpanDays(m)).toBe(7 / 3);
+  });
+  it('daily / interval devuelven 1', () => {
+    expect(cadenceSpanDays(med({ schedule: { freq: 'daily', times: ['08:00'] } }))).toBe(1);
+    expect(cadenceSpanDays(med({ schedule: { freq: 'interval', times: ['08:00'], intervalHours: 8 } }))).toBe(1);
   });
 });
 

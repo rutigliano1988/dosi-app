@@ -210,7 +210,7 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
   // Rebuild today's doses whenever any schedule-relevant field changes
   // (pause/resume, freq, weekdays, times, duration) — not just the med count.
   const schedSig = meds
-    .map(m => `${m.id}|${m.paused ? 1 : 0}|${m.schedule.freq}|${(m.schedule.weekdays ?? []).join(',')}|${expandTimes(m).join(',')}|${m.duration.kind}:${m.duration.days ?? ''}:${m.duration.until ?? ''}:${m.duration.startedOn}`)
+    .map(m => `${m.id}|${m.paused ? 1 : 0}|${m.schedule.freq}|${(m.schedule.weekdays ?? []).join(',')}|${m.schedule.intervalDays ?? ''}|${expandTimes(m).join(',')}|${m.duration.kind}:${m.duration.days ?? ''}:${m.duration.until ?? ''}:${m.duration.startedOn}`)
     .join(';');
   const prevSchedSig = useRef(schedSig);
   useEffect(() => {
@@ -388,6 +388,8 @@ export default function App({ themeName: initialTheme = 'light', lang: initialLa
               ? { freq: 'interval', times: [d.times[0] ?? '08:00'], intervalHours: d.intervalHours }
               : d.freq === 'weekdays'
               ? { freq: 'weekdays', times: cleanTimes, weekdays: d.weekdays }
+              : d.freq === 'everyNDays'
+              ? { freq: 'everyNDays', times: cleanTimes, intervalDays: d.intervalDays }
               : { freq: 'daily', times: cleanTimes };
           const buildDuration = (startedOn: string): Medicine['duration'] =>
             d.duration === 'days'
