@@ -62,6 +62,23 @@ describe('paridad browser ↔ _shared', () => {
     expect(shared.isActiveOn(m, new Date(2026, 8, 1))).toBe(false);  // martes
   });
 
+  it('isActiveOn: everyNDays — paridad exacta con el motor del navegador', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    });
+    const dias = [
+      new Date(2026, 7, 1), new Date(2026, 7, 5), new Date(2026, 7, 11),
+      new Date(2026, 7, 15), new Date(2026, 7, 21),
+    ];
+    for (const d of dias) {
+      expect(shared.isActiveOn(m, d)).toBe(browser.isActiveOn(m, d));
+    }
+    expect(shared.isActiveOn(m, new Date(2026, 7, 1))).toBe(true);
+    expect(shared.isActiveOn(m, new Date(2026, 7, 5))).toBe(false);
+    expect(shared.isActiveOn(m, new Date(2026, 7, 11))).toBe(true);
+  });
+
   it('buildTodayDoses: ids con fecha local y orden', () => {
     const meds = [
       med({ id: 'a', schedule: { freq: 'daily', times: ['20:00', '08:00'] } }),

@@ -74,6 +74,12 @@ export function isActiveOn(med: Medicine, day: Date): boolean {
   if (med.schedule.freq === 'weekdays') {
     return (med.schedule.weekdays ?? []).includes(isoWeekday(day));
   }
+  if (med.schedule.freq === 'everyNDays') {
+    const n = med.schedule.intervalDays ?? 1;
+    if (n < 1) return false;
+    const elapsed = daysBetween(med.duration.startedOn, day);
+    return elapsed >= 0 && elapsed % n === 0;
+  }
   return true;
 }
 
