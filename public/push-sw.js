@@ -15,17 +15,24 @@ self.addEventListener('push', (event) => {
   if (d.endpoint && d.secret) {
     event.waitUntil(idbSet('latest', { endpoint: d.endpoint, secret: d.secret }).catch(() => {}));
   }
-  event.waitUntil(
-    self.registration.showNotification(d.title, {
-      body: d.body,
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
-      tag: d.tag,
-      renotify: Boolean(d.tag),
-      data: d,
-      actions,
-    })
-  );
+  // Los avisos con botones (tomar/posponer, marcar/recordar) exigen una
+  // acción del usuario: no desaparecen solos y vibran con un patrón propio
+  // para que no se pierdan entre el resto de notificaciones del teléfono.
+  // Los informativos (stock, caducidad) se quedan como antes.
+  const opts = {
+    body: d.body,
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    tag: d.tag,
+    renotify: Boolean(d.tag),
+    data: d,
+    actions,
+  };
+  if (actions.length > 0) {
+    opts.requireInteraction = true;
+    opts.vibrate = [200, 100, 200, 100, 200];
+  }
+  event.waitUntil(self.registration.showNotification(d.title, opts));
 });
 
 // Solo se permite POSTear el secret a las Edge Functions de este proyecto Supabase.
