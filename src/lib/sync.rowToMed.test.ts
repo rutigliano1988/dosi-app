@@ -11,6 +11,12 @@ const cases: Record<string, unknown>[] = [
   },
   { id: 'm2' }, // fila mínima → defaults
   { id: 'm3', paused: 'yes' }, // paused no-booleano → false
+  {
+    id: 'm4', name: 'Insulina', dose: '1 dosis', form: 'injection', color: 'sky',
+    schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+    duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    stock: 5,
+  },
 ];
 
 describe('rowToMed: paridad sync.ts ↔ _shared/types.ts', () => {
@@ -22,6 +28,15 @@ describe('rowToMed: paridad sync.ts ↔ _shared/types.ts', () => {
       expect(JSON.parse(JSON.stringify(a))).toEqual(JSON.parse(JSON.stringify(b)));
     });
   }
+
+  it('everyNDays: intervalDays sobrevive la normalización en ambos lados', () => {
+    const row = {
+      id: 'm5', schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    };
+    expect(browserRowToMed(row).schedule.intervalDays).toBe(10);
+    expect(sharedRowToMed(row).schedule.intervalDays).toBe(10);
+  });
 
   it('fila mínima: defaults esperados', () => {
     const m = browserRowToMed({ id: 'x' });

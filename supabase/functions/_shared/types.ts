@@ -63,6 +63,7 @@ export function rowToMed(r: Record<string, unknown>): Medicine {
       times: Array.isArray(sched.times) && sched.times.length ? (sched.times as string[]) : ['08:00'],
       weekdays: Array.isArray(sched.weekdays) ? (sched.weekdays as number[]) : undefined,
       intervalHours: sched.intervalHours as (6 | 8 | 12 | undefined),
+      intervalDays: typeof sched.intervalDays === 'number' ? sched.intervalDays : undefined,
     },
     duration: {
       kind: (dur.kind ?? 'ongoing') as DurationKind,
