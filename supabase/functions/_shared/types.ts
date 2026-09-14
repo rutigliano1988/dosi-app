@@ -4,7 +4,7 @@
 
 export type MedForm = 'capsule' | 'pill' | 'syrup' | 'injection' | 'drops';
 export type DoseStatus = 'upcoming' | 'now' | 'taken' | 'skipped' | 'missed';
-export type FreqKind = 'daily' | 'weekdays' | 'interval';
+export type FreqKind = 'daily' | 'weekdays' | 'interval' | 'everyNDays';
 export type DurationKind = 'ongoing' | 'days' | 'until';
 
 export interface MedSchedule {
@@ -12,6 +12,7 @@ export interface MedSchedule {
   times: string[];
   weekdays?: number[];
   intervalHours?: 6 | 8 | 12;
+  intervalDays?: number;
 }
 
 export interface MedDuration {

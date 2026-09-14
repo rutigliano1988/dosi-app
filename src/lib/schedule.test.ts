@@ -100,6 +100,39 @@ describe('isActiveOn', () => {
   it('paused nunca activo', () => {
     expect(isActiveOn(med({ paused: true }), lunes)).toBe(false);
   });
+  it('everyNDays: activo el día de inicio y cada N días después', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    });
+    expect(isActiveOn(m, new Date(2026, 7, 1))).toBe(true);   // día 0
+    expect(isActiveOn(m, new Date(2026, 7, 11))).toBe(true);  // día 10
+    expect(isActiveOn(m, new Date(2026, 7, 21))).toBe(true);  // día 20
+  });
+  it('everyNDays: inactivo los días intermedios', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    });
+    expect(isActiveOn(m, new Date(2026, 7, 5))).toBe(false);
+    expect(isActiveOn(m, new Date(2026, 7, 10))).toBe(false);
+    expect(isActiveOn(m, new Date(2026, 7, 12))).toBe(false);
+  });
+  it('everyNDays: inactivo antes del inicio del tratamiento', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'], intervalDays: 10 },
+      duration: { kind: 'ongoing', startedOn: '2026-08-15' },
+    });
+    expect(isActiveOn(m, new Date(2026, 7, 5))).toBe(false);
+  });
+  it('everyNDays: intervalDays ausente no revienta (por defecto 1, activo cada día)', () => {
+    const m = med({
+      schedule: { freq: 'everyNDays', times: ['09:00'] },
+      duration: { kind: 'ongoing', startedOn: '2026-08-01' },
+    });
+    expect(isActiveOn(m, new Date(2026, 7, 1))).toBe(true);
+    expect(isActiveOn(m, new Date(2026, 7, 2))).toBe(true);
+  });
 });
 
 describe('treatmentDay', () => {
