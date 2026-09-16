@@ -99,10 +99,11 @@ function StepBasics({ theme, t, data, upd }: { theme: Theme; t: Props['t']; data
       </Field>
       <Field theme={theme} label={t('form')}>
         <SegmentedRow theme={theme} value={data.form} onChange={v => upd('form', v)} options={[
-          { id: 'capsule', label: t('formCapsule') },
-          { id: 'pill',    label: t('formPill') },
-          { id: 'syrup',   label: t('formSyrup') },
-          { id: 'drops',   label: t('formDrops') },
+          { id: 'capsule',   label: t('formCapsule') },
+          { id: 'pill',      label: t('formPill') },
+          { id: 'syrup',     label: t('formSyrup') },
+          { id: 'drops',     label: t('formDrops') },
+          { id: 'injection', label: t('formInjection') },
         ]} />
       </Field>
       <Field theme={theme} label={t('color')}>

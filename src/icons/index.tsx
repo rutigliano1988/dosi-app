@@ -174,8 +174,15 @@ const syrup: IconFn = (s = 22, c = 'currentColor') => (
   </svg>
 );
 
+const syringe: IconFn = (s = 22, c = 'currentColor') => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none">
+    <path d="M18 2l4 4M17 7l3-3M19 9L8.7 19.3a1.7 1.7 0 0 1-2.4 0l-.6-.6a1.7 1.7 0 0 1 0-2.4L15 6M9 11l4 4M5 19l-3 3M14 4l6 6"
+      stroke={c} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const I = {
   pill, check, plus, home, box, cal, user, bell, clock,
   search, back, close, chev, more, alert, heart, share,
-  edit, trash, pause, drop, sun, moon, globe, syrup, logout,
+  edit, trash, pause, drop, sun, moon, globe, syrup, syringe, logout,
 };

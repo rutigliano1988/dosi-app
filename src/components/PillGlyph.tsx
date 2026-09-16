@@ -14,14 +14,16 @@ export default function PillGlyph({ color, size = 40, form = 'capsule', dark = f
   const bg = dark ? `${entry.dot}22` : entry.soft;
   const stroke = entry.dot;
 
-  if (form === 'syrup' || form === 'drops') {
+  if (form === 'syrup' || form === 'drops' || form === 'injection') {
     return (
       <div style={{
         width: size, height: size, borderRadius: 12,
         background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: stroke, flexShrink: 0,
       }}>
-        {form === 'drops' ? I.drop(size * 0.55, stroke, true) : I.syrup(size * 0.55, stroke)}
+        {form === 'drops' ? I.drop(size * 0.55, stroke, true)
+          : form === 'injection' ? I.syringe(size * 0.55, stroke)
+          : I.syrup(size * 0.55, stroke)}
       </div>
     );
   }
